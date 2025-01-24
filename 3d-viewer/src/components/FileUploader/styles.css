@@ -1,0 +1,60 @@
+.file-uploader {
+    width: 100%;
+}
+
+.dropzone {
+    border: 2px dashed var(--divider-color);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-xl);
+    text-align: center;
+    background-color: var(--background-color);
+    cursor: pointer;
+    transition: all var(--transition-normal);
+    position: relative;
+    overflow: hidden;
+}
+
+.dropzone:hover {
+    border-color: var(--primary-color);
+    background-color: rgba(25, 118, 210, 0.04);
+}
+
+.dropzone.active {
+    border-color: var(--primary-color);
+    background-color: rgba(25, 118, 210, 0.08);
+}
+
+.dropzone p {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+}
+
+.dropzone::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--primary-color);
+    opacity: 0;
+    transition: opacity var(--transition-normal);
+    pointer-events: none;
+}
+
+.dropzone.active::before {
+    opacity: 0.05;
+}
+
+.supported-formats {
+    margin-top: var(--spacing-md);
+    padding: var(--spacing-sm);
+    background-color: var(--surface-color);
+    border-radius: var(--border-radius-sm);
+    color: var(--text-secondary);
+    font-size: var(--font-size-xs);
+    text-align: center;
+    border: 1px solid var(--divider-color);
+}

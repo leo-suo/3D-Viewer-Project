@@ -1,0 +1,45 @@
+.logs-section {
+    border-top: 1px solid var(--divider-color);
+    padding: var(--spacing-sm);
+    height: var(--logs-height);
+}
+
+.section-title {
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    margin-bottom: 0.5rem;
+    padding: 0 0.5rem;
+}
+
+.logs-content {
+    height: calc(100% - 25px);
+    padding: 0.75rem;
+    overflow-y: auto;
+    border-radius: 4px;
+    border: 1px solid var(--divider-color);
+    background-color: #1E1E1E;
+    font-family: monospace;
+}
+
+.log-entry {
+    color: #E0E0E0;
+    font-size: 0.7rem;
+    line-height: 1.4;
+    margin-bottom: 0.25rem;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+@media (min-width: 600px) {
+    .logs-section {
+        padding: 0.75rem;
+    }
+
+    .section-title {
+        font-size: 0.8rem;
+    }
+
+    .log-entry {
+        font-size: 0.75rem;
+    }
+} 

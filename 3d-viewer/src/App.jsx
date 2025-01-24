@@ -1,32 +1,28 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import ThreeDViewer from './components/3DViewer.jsx';
-import FileUploader from './components/FileUploader.jsx';
-import './App.css'
+import React, { useState } from 'react'
+import DashboardLayout from './components/Dashboard'
+import './styles/global.css'
 
 function App() {
-    const [pointCloudData, setPointCloudData] = useState([]);
+    const [pointCloudData, setPointCloudData] = useState(null);
+    const [userLogs, setUserLogs] = useState([]);
+
+    const handleFileUpload = (fileData) => {
+        setPointCloudData(fileData);
+        const timestamp = new Date().toLocaleTimeString('en-US', { 
+            hour12: false,
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
+        setUserLogs(prev => [...prev, `[${timestamp}] Uploaded "${fileData.file.name}" (${(fileData.file.size / 1024).toFixed(2)} KB)`]);
+    };
 
     return (
-        <div
-            style={{
-                width: '100vw',
-                height: '100vh',
-                margin: 0,
-                padding: 0,
-                display: 'flex',
-                flexDirection: 'column'
-            }}
-        >
-            {/* FileUploader Component */}
-            <FileUploader onFileUpload={setPointCloudData} />
-
-            {/* 3D Viewer Component */}
-            <div style={{ flex: 1 }}>
-                <ThreeDViewer pointCloudData={pointCloudData} />
-            </div>
-        </div>
+        <DashboardLayout
+            pointCloudData={pointCloudData}
+            userLogs={userLogs}
+            onFileUpload={handleFileUpload}
+        />
     );
 }
 

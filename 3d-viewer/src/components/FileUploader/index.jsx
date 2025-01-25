@@ -52,27 +52,29 @@ function FileUploader({ onFileUpload }) {
 
         try {
             const text = await file.text();
-            let pointCloudData;
+            let Data;
 
             if (file.name.endsWith('.json')) {
-                pointCloudData = JSON.parse(text);
+                Data = JSON.parse(text);
             } else if (file.name.endsWith('.xyz') || file.name.endsWith('.txt')) {
-                pointCloudData = text.trim().split('\n').map(line => {
+                Data = text.trim().split('\n').map(line => {
                     const [x, y, z] = line.trim().split(/\s+/).map(Number);
                     return { x, y, z };
                 });
             } else if (file.name.endsWith('.pcd')) {
-                pointCloudData = await parsePCDFile(text);
+                Data = await parsePCDFile(text);
+            } else if (file.name.endsWith('.geojson')) {
+                Data = JSON.parse(text);
             }
 
-            if (pointCloudData && pointCloudData.length > 0) {
-                console.log(`Loaded ${pointCloudData.length} points from ${file.name}`);
+            if (Data && Data.length > 0) {
+                console.log(`Loaded ${Data.length} points from ${file.name}`);
                 onFileUpload({
                     file: {
                         name: file.name,
                         size: file.size
                     },
-                    pointCloud: pointCloudData
+                    pointCloud: Data
                 });
             } else {
                 throw new Error('No valid point cloud data found in file.');
@@ -86,7 +88,7 @@ function FileUploader({ onFileUpload }) {
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
         onDrop,
         accept: {
-            'application/json': ['.json'],
+            'application/json': ['.json', '.geojson'],
             'text/plain': ['.xyz', '.txt', '.pcd']
         },
         multiple: false

@@ -1,12 +1,20 @@
+import React from 'react';
 import PropTypes from 'prop-types';
-import { Box, Typography } from '@mui/material';
+import { Box, Typography, FormControlLabel, Switch } from '@mui/material';
 import FileUploader from '../FileUploader';
 import ThreeDViewer from '../ThreeDViewer';
+import MapViewer from '../MapViewer';
 import FileInfo from '../FileInfo';
 import ActivityLogs from '../ActivityLogs';
 import './styles.css';
 
 function DashboardLayout({ pointCloudData, userLogs, onFileUpload }) {
+    const [viewMode, setViewMode] = React.useState('3D');
+
+    const handleViewModeChange = (event) => {
+        setViewMode(event.target.checked ? '2D' : '3D');
+    };
+
     return (
         <Box
             sx={{
@@ -41,6 +49,36 @@ function DashboardLayout({ pointCloudData, userLogs, onFileUpload }) {
                     <FileUploader onFileUpload={onFileUpload} />
                 </Box>
                 
+                {/* View Mode Switch */}
+                <Box sx={{ 
+                    my: 2,
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    width: { xs: '50%', md: '100%' }
+                }}>
+                    <FormControlLabel
+                        control={
+                            <Switch
+                                checked={viewMode === '2D'}
+                                onChange={handleViewModeChange}
+                                color="primary"
+                            />
+                        }
+                        label={
+                            <Typography 
+                                variant="body2" 
+                                sx={{ 
+                                    fontSize: { xs: '0.7rem', md: '0.8rem' },
+                                    color: 'text.secondary'
+                                }}
+                            >
+                                {viewMode === '3D' ? '3D View' : '2D Map'}
+                            </Typography>
+                        }
+                    />
+                </Box>
+                
                 {pointCloudData && (
                     <Box sx={{ 
                         flex: 1,
@@ -72,7 +110,7 @@ function DashboardLayout({ pointCloudData, userLogs, onFileUpload }) {
                     overflow: 'hidden'
                 }}
             >
-                {/* 3D Viewer */}
+                {/* Viewer */}
                 <Box
                     sx={{
                         flex: 1,
@@ -93,7 +131,15 @@ function DashboardLayout({ pointCloudData, userLogs, onFileUpload }) {
                             }
                         }}
                     >
-                        <ThreeDViewer pointCloudData={pointCloudData?.pointCloud} />
+                        {viewMode === '3D' ? (
+                            <ThreeDViewer key="3d" pointCloudData={pointCloudData?.pointCloud} />
+                        ) : (
+                            <MapViewer 
+                                key="2d" 
+                                geoData={pointCloudData?.pointCloud}
+                                fileType={pointCloudData?.file?.name?.split('.').pop()}
+                            />
+                        )}
                     </Box>
                 </Box>
 

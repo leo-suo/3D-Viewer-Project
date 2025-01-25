@@ -4,7 +4,7 @@ import { Card, Box, Typography } from '@mui/material';
 function FileInfo({ fileData }) {
     if (!fileData) return null;
 
-    const { file, pointCloud } = fileData;
+    const { file, pointCloud, geoJson } = fileData;
     const bounds = calculateBounds(pointCloud);
     
     const formatFileSize = (bytes) => {
@@ -42,7 +42,7 @@ function FileInfo({ fileData }) {
                     Points:
                 </Typography>
                 <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', pl: 3 }}>
-                    {pointCloud.length.toLocaleString()}
+                    {pointCloud ? pointCloud.length.toLocaleString() : geoJson ? geoJson.length.toLocaleString() : 0}
                 </Typography>
                 <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', mt: 1 }}>
                     Dimensions:
@@ -110,7 +110,8 @@ FileInfo.propTypes = {
             x: PropTypes.number.isRequired,
             y: PropTypes.number.isRequired,
             z: PropTypes.number.isRequired
-        })).isRequired
+        })),
+        geoJson: PropTypes.array
     })
 };
 

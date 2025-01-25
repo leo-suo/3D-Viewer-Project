@@ -15,6 +15,19 @@ function DashboardLayout({ pointCloudData, userLogs, onFileUpload }) {
         setViewMode(event.target.checked ? '2D' : '3D');
     };
 
+    const handleFileUpload = (fileData) => {
+        // Automatically switch view mode based on file type
+        const fileExtension = fileData.file.name.split('.').pop().toLowerCase();
+        if (fileExtension === 'geojson') {
+            setViewMode('2D');
+        } else if (['xyz', 'pcd'].includes(fileExtension)) {
+            setViewMode('3D');
+        }
+        
+        // Pass the file data to parent
+        onFileUpload(fileData);
+    };
+
     return (
         <Box
             sx={{
@@ -46,10 +59,10 @@ function DashboardLayout({ pointCloudData, userLogs, onFileUpload }) {
                     flexShrink: 0,
                     width: { xs: '50%', md: '100%' }
                 }}>
-                    <FileUploader onFileUpload={onFileUpload} />
+                    <FileUploader onFileUpload={handleFileUpload} />
                 </Box>
                 
-                {/* View Mode Switch */}
+                {/* View Mode Switch - disabled for GeoJSON files */}
                 <Box sx={{ 
                     my: 2,
                     display: 'flex',
@@ -132,12 +145,14 @@ function DashboardLayout({ pointCloudData, userLogs, onFileUpload }) {
                         }}
                     >
                         {viewMode === '3D' ? (
-                            <ThreeDViewer key="3d" pointCloudData={pointCloudData?.pointCloud} />
+                            <ThreeDViewer 
+                                key="3d" 
+                                pointCloudData={pointCloudData?.pointCloud} 
+                            />
                         ) : (
                             <MapViewer 
                                 key="2d" 
-                                geoData={pointCloudData?.pointCloud}
-                                fileType={pointCloudData?.file?.name?.split('.').pop()}
+                                geoData={pointCloudData?.geoJson}
                             />
                         )}
                     </Box>
@@ -156,11 +171,15 @@ DashboardLayout.propTypes = {
             name: PropTypes.string.isRequired,
             size: PropTypes.number.isRequired
         }).isRequired,
-        pointCloud: PropTypes.arrayOf(PropTypes.shape({
-            x: PropTypes.number.isRequired,
-            y: PropTypes.number.isRequired,
-            z: PropTypes.number.isRequired
-        })).isRequired
+        pointCloud: PropTypes.oneOfType([
+            PropTypes.arrayOf(PropTypes.shape({
+                x: PropTypes.number.isRequired,
+                y: PropTypes.number.isRequired,
+                z: PropTypes.number.isRequired
+            })),
+            PropTypes.object
+        ]),
+        geoJson: PropTypes.any
     }),
     userLogs: PropTypes.arrayOf(PropTypes.string).isRequired,
     onFileUpload: PropTypes.func.isRequired

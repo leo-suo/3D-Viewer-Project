@@ -8,7 +8,7 @@ import { Box, Typography } from '@mui/material';
 // You'll need to get a Mapbox token from https://www.mapbox.com/
 const MAPBOX_TOKEN = 'pk.eyJ1IjoibGVvc3VvIiwiYSI6ImNtNmJhbzhxMDA2bmkyam84ejh3dngyZWkifQ.GIxeZlnIerRey6wNUQmiCQ';
 
-function MapViewer({ geoData, fileType }) {
+function MapViewer({ geoData }) {
     const deckRef = useRef(null);
     const mapRef = useRef(null);
     const [mapError, setMapError] = useState(false);
@@ -40,14 +40,14 @@ function MapViewer({ geoData, fileType }) {
     }, []);
 
     // Only show data if it's GeoJSON
-    const isValidFileType = fileType?.toLowerCase() === 'geojson';
+    const isValidFileType = geoData?.length > 0;
     const layers = [
         new ScatterplotLayer({
             id: 'scatter-plot',
-            data: isValidFileType ? (geoData || []) : [],
-            getPosition: d => [d.x, d.y],
+            data: isValidFileType ? geoData : [],
+            getPosition: d => d.coordinates,
             getFillColor: [255, 0, 0],
-            getRadius: 10,
+            getRadius: 5,
             opacity: 0.3,
             pickable: true,
             radiusMinPixels: 3,

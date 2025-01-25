@@ -64,7 +64,18 @@ function FileUploader({ onFileUpload }) {
             } else if (file.name.endsWith('.pcd')) {
                 Data = await parsePCDFile(text);
             } else if (file.name.endsWith('.geojson')) {
-                Data = JSON.parse(text);
+                let jsonData = JSON.parse(text);
+                Data = []
+                jsonData.features.forEach(feature => {
+                    const coordinates = feature.geometry.coordinates || [];
+                    const name = feature.properties.LANDMARK || '';
+                    const formattedEntry = {
+                        name: name,
+                        coordinates: coordinates
+                    };
+                    Data.push(formattedEntry);
+                })
+
             }
 
             if (Data && Data.length > 0) {
@@ -74,7 +85,8 @@ function FileUploader({ onFileUpload }) {
                         name: file.name,
                         size: file.size
                     },
-                    pointCloud: Data
+                    pointCloud: (file.name.endsWith('.xyz') || file.name.endsWith('.pcd')) ? Data : [],
+                    geoJson: (file.name.endsWith('.geojson')) ? Data : []
                 });
             } else {
                 throw new Error('No valid point cloud data found in file.');

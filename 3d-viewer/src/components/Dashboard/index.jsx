@@ -55,22 +55,27 @@ function DashboardLayout({ pointCloudData, userLogs, onFileUpload }) {
                     overflow: 'auto'
                 }}
             >
-                <Box sx={{ 
-                    flexShrink: 0,
-                    width: { xs: '50%', md: '100%' }
-                }}>
+                <Box 
+                    className="dashboard__uploader-container"
+                    sx={{ 
+                        flexShrink: 0,
+                        width: { xs: '50%', md: '100%' }
+                    }}>
                     <FileUploader onFileUpload={handleFileUpload} />
                 </Box>
                 
                 {/* View Mode Switch - disabled for GeoJSON files */}
-                <Box sx={{ 
-                    my: 2,
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    width: { xs: '50%', md: '100%' }
-                }}>
+                <Box 
+                    className="dashboard__view-switch"
+                    sx={{ 
+                        my: 2,
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        width: { xs: '50%', md: '100%' }
+                    }}>
                     <FormControlLabel
+                        className="dashboard__view-switch-label"
                         control={
                             <Switch
                                 checked={viewMode === '2D'}
@@ -79,7 +84,8 @@ function DashboardLayout({ pointCloudData, userLogs, onFileUpload }) {
                             />
                         }
                         label={
-                            <Typography 
+                            <Typography
+                                className="dashboard__view-switch-label"
                                 variant="body2" 
                                 sx={{ 
                                     fontSize: { xs: '0.7rem', md: '0.8rem' },
@@ -93,12 +99,14 @@ function DashboardLayout({ pointCloudData, userLogs, onFileUpload }) {
                 </Box>
                 
                 {pointCloudData && (
-                    <Box sx={{ 
-                        flex: 1,
-                        overflow: 'auto',
-                        width: { xs: '50%', md: '100%' }
+                    <Box className="dashboard__file-info-container"
+                        sx={{ 
+                            flex: 1,
+                            overflow: 'auto',
+                            width: { xs: '50%', md: '100%' }
                     }}>
                         <Typography 
+                            className="dashboard__file-info-title"
                             variant="subtitle2" 
                             sx={{ 
                                 mb: 1,
@@ -115,6 +123,7 @@ function DashboardLayout({ pointCloudData, userLogs, onFileUpload }) {
 
             {/* Main Content Area */}
             <Box
+                className="dashboard__main"
                 sx={{
                     flex: 1,
                     display: 'flex',
@@ -125,6 +134,7 @@ function DashboardLayout({ pointCloudData, userLogs, onFileUpload }) {
             >
                 {/* Viewer */}
                 <Box
+                    className="dashboard__viewer-container"
                     sx={{
                         flex: 1,
                         p: { xs: 1, sm: 2 },
@@ -132,6 +142,7 @@ function DashboardLayout({ pointCloudData, userLogs, onFileUpload }) {
                     }}
                 >
                     <Box
+                        className="dashboard__viewer-box"
                         sx={{
                             height: '100%',
                             bgcolor: 'background.paper',

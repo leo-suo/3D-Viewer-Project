@@ -111,7 +111,7 @@ FileInfo.propTypes = {
             y: PropTypes.number.isRequired,
             z: PropTypes.number.isRequired
         })),
-        geoJson: PropTypes.array
+        geoJson: PropTypes.object
     })
 };
 

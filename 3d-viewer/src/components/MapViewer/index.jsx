@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import DeckGL from '@deck.gl/react';
-import { ScatterplotLayer } from '@deck.gl/layers';
+import { GeoJsonLayer } from '@deck.gl/layers';
 import Map from 'react-map-gl';
 import { Box, Typography } from '@mui/material';
 
@@ -12,6 +12,7 @@ function MapViewer({ geoData }) {
     const deckRef = useRef(null);
     const mapRef = useRef(null);
     const [mapError, setMapError] = useState(false);
+    const [tooltip, setTooltip] = useState(null);
     
     const [viewState, setViewState] = useState({
         longitude: -122.41669,
@@ -39,24 +40,63 @@ function MapViewer({ geoData }) {
         };
     }, []);
 
-    // Only show data if it's GeoJSON
-    const isValidFileType = geoData?.length > 0;
-    const layers = [
-        new ScatterplotLayer({
-            id: 'scatter-plot',
-            data: isValidFileType ? geoData : [],
-            getPosition: d => d.coordinates,
-            getFillColor: [255, 0, 0],
-            getRadius: 5,
-            opacity: 0.3,
-            pickable: true,
-            radiusMinPixels: 3,
-            radiusMaxPixels: 30
-        })
-    ];
+    useEffect(() => {
+        console.log(geoData);
+        if (geoData && geoData.features.length > 0) {
+            const coordinates = geoData.features.map(f => f.geometry.coordinates);
+            const lons = coordinates.map(coord => coord[0]);
+            const lats = coordinates.map(coord => coord[1]);
+    
+            const minLon = Math.min(...lons);
+            const maxLon = Math.max(...lons);
+            const minLat = Math.min(...lats);
+            const maxLat = Math.max(...lats);
+    
+            setViewState(prevState => {
+                if (prevState.longitude !== (minLon + maxLon) / 2 || prevState.latitude !== (minLat + maxLat) / 2) {
+                    return {
+                        longitude: (minLon + maxLon) / 2,
+                        latitude: (minLat + maxLat) / 2,
+                        zoom: Math.max(
+                            1,
+                            Math.min(
+                                15,
+                                Math.log2(360 / Math.max(maxLon - minLon, maxLat - minLat))
+                            )
+                        ),
+                        pitch: 0,
+                        bearing: 0
+                    };
+                }
+                return prevState;
+            });
+        }
+    }, [geoData]);
+
+    const layers = useMemo(() => {
+        if (!geoData || !geoData.features || geoData.features.length === 0) {
+            return [];
+        }
+        return [
+            new GeoJsonLayer({
+                id: 'scatter-plot',
+                data: geoData,
+                getFillColor: [255, 0, 0],
+                getPointRadius: 10,
+                opacity: 0.3,
+                pickable: true,
+                pointRadiusMinPixels: 4,
+                pointRadiusMaxPixels: 4,
+                onHover: ({ object, x, y }) => {
+                    const tooltipContent = object ? `${object.properties.LANDMARK}, ${object.properties.CATEGORY}` : null;
+                    setTooltip(tooltipContent ? { tooltip: tooltipContent, x, y } : '');
+                }
+            })
+        ];
+    }, [geoData]);
 
     return (
-        <Box sx={{ 
+        <Box className='map-viewer' sx={{ 
             position: 'relative', 
             width: '100%', 
             height: '100%',
@@ -82,6 +122,7 @@ function MapViewer({ geoData }) {
                 </Box>
             )}
             <DeckGL
+                className="map-viewer__deck"
                 ref={deckRef}
                 initialViewState={viewState}
                 controller={true}
@@ -94,6 +135,7 @@ function MapViewer({ geoData }) {
                 }}
             >
                 <Map
+                    className="map-viewer__mapbox"
                     ref={mapRef}
                     mapboxAccessToken={MAPBOX_TOKEN}
                     mapStyle="mapbox://styles/mapbox/dark-v9"
@@ -101,17 +143,45 @@ function MapViewer({ geoData }) {
                     onError={() => setMapError(true)}
                 />
             </DeckGL>
+            {tooltip && (
+                <div
+                    className="map-viewer__tooltip"
+                    style={{
+                        position: 'absolute',
+                        left: tooltip.x,
+                        top: tooltip.y,
+                        background: 'rgba(0, 0, 0, 0.7)',
+                        color: '#fff',
+                        padding: '5px',
+                        borderRadius: '3px',
+                        pointerEvents: 'none'
+                    }}
+                >
+                    {tooltip.tooltip}
+                </div>
+            )}
         </Box>
     );
 }
 
 MapViewer.propTypes = {
-    geoData: PropTypes.arrayOf(PropTypes.shape({
-        x: PropTypes.number.isRequired,
-        y: PropTypes.number.isRequired,
-        z: PropTypes.number.isRequired
-    })),
-    fileType: PropTypes.string
+    geoData: PropTypes.shape({
+        type: PropTypes.string.isRequired,
+        features: PropTypes.arrayOf(
+            PropTypes.shape({
+                type: PropTypes.string.isRequired,
+                geometry: PropTypes.shape({
+                    type: PropTypes.string.isRequired,
+                    coordinates: PropTypes.arrayOf(PropTypes.number).isRequired
+                }).isRequired,
+                properties: PropTypes.shape({
+                    LANDMARK: PropTypes.string,
+                    CATEGORY: PropTypes.string,
+                    MUNICIPALITY: PropTypes.string
+                }).isRequired
+            })
+        ).isRequired
+    })
 };
 
 export default MapViewer; 

@@ -64,21 +64,10 @@ function FileUploader({ onFileUpload }) {
             } else if (file.name.endsWith('.pcd')) {
                 Data = await parsePCDFile(text);
             } else if (file.name.endsWith('.geojson')) {
-                let jsonData = JSON.parse(text);
-                Data = []
-                jsonData.features.forEach(feature => {
-                    const coordinates = feature.geometry.coordinates || [];
-                    const name = feature.properties.LANDMARK || '';
-                    const formattedEntry = {
-                        name: name,
-                        coordinates: coordinates
-                    };
-                    Data.push(formattedEntry);
-                })
-
+                Data = JSON.parse(text);
             }
 
-            if (Data && Data.length > 0) {
+            if (Data) {
                 console.log(`Loaded ${Data.length} points from ${file.name}`);
                 onFileUpload({
                     file: {
@@ -86,7 +75,7 @@ function FileUploader({ onFileUpload }) {
                         size: file.size
                     },
                     pointCloud: (file.name.endsWith('.xyz') || file.name.endsWith('.pcd')) ? Data : [],
-                    geoJson: (file.name.endsWith('.geojson')) ? Data : []
+                    geoJson: (file.name.endsWith('.geojson')) ? Data : {}
                 });
             } else {
                 throw new Error('No valid point cloud data found in file.');
@@ -109,6 +98,7 @@ function FileUploader({ onFileUpload }) {
     return (
         <Box
             {...getRootProps()}
+            className="file-uploader"
             sx={{
                 height: '100%',
                 display: 'flex',
@@ -127,8 +117,9 @@ function FileUploader({ onFileUpload }) {
                 }
             }}
         >
-            <input {...getInputProps()} />
+            <input {...getInputProps()} className="file-uploader__input" />
             <CloudUploadIcon 
+                className="file-uploader__icon"
                 sx={{ 
                     fontSize: { xs: 24, sm: 28 },
                     color: isDragActive ? 'primary.main' : 'text.secondary',
@@ -136,9 +127,10 @@ function FileUploader({ onFileUpload }) {
                     flexShrink: 0
                 }}
             />
-            <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Box className="file-uploader__content" sx={{ flex: 1, minWidth: 0 }}>
                 <Typography 
                     variant="body2"
+                    className="file-uploader__text"
                     sx={{
                         color: 'text.secondary',
                         fontSize: { xs: '0.75rem', sm: '0.875rem' },

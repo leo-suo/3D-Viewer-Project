@@ -69,14 +69,16 @@ function FileUploader({ onFileUpload }) {
 
             if (Data) {
                 console.log(`Loaded ${Data.length} points from ${file.name}`);
-                onFileUpload({
+                const fileData = {
                     file: {
                         name: file.name,
                         size: file.size
                     },
-                    pointCloud: (file.name.endsWith('.xyz') || file.name.endsWith('.pcd')) ? Data : [],
-                    geoJson: (file.name.endsWith('.geojson')) ? Data : {}
-                });
+                    pointCloud: file.name.endsWith('.pcd') || file.name.endsWith('.xyz') ? Data : [],
+                    geoJson: file.name.endsWith('.geojson') ? Data : null
+                };
+                console.log('Sending fileData:', fileData);
+                onFileUpload(fileData);
             } else {
                 throw new Error('No valid point cloud data found in file.');
             }

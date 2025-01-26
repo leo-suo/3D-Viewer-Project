@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import PropTypes from 'prop-types';
 import { Box, Typography, FormControlLabel, Switch } from '@mui/material';
 import FileUploader from '../FileUploader';
@@ -8,24 +8,22 @@ import FileInfo from '../FileInfo';
 import ActivityLogs from '../ActivityLogs';
 import './styles.css';
 
-function DashboardLayout({ pointCloudData, userLogs, onFileUpload }) {
-    const [viewMode, setViewMode] = React.useState('3D');
+function DashboardLayout({ userLogs, onFileUpload }) {
+    const [viewMode, setViewMode] = useState('3D');
+    const [fileData, setFileData] = useState(null);
 
-    const handleViewModeChange = (event) => {
-        setViewMode(event.target.checked ? '2D' : '3D');
-    };
-
-    const handleFileUpload = (fileData) => {
+    const handleFileUpload = (data) => {
+        console.log('Dashboard received fileData:', data);
         // Automatically switch view mode based on file type
-        const fileExtension = fileData.file.name.split('.').pop().toLowerCase();
+        const fileExtension = data.file.name.split('.').pop().toLowerCase();
         if (fileExtension === 'geojson') {
             setViewMode('2D');
         } else if (['xyz', 'pcd'].includes(fileExtension)) {
             setViewMode('3D');
         }
         
-        // Pass the file data to parent
-        onFileUpload(fileData);
+        setFileData(data);
+        onFileUpload(data);
     };
 
     return (
@@ -64,7 +62,7 @@ function DashboardLayout({ pointCloudData, userLogs, onFileUpload }) {
                     <FileUploader onFileUpload={handleFileUpload} />
                 </Box>
                 
-                {/* View Mode Switch - disabled for GeoJSON files */}
+                {/* View Mode Switch */}
                 <Box 
                     className="dashboard__view-switch"
                     sx={{ 
@@ -79,7 +77,7 @@ function DashboardLayout({ pointCloudData, userLogs, onFileUpload }) {
                         control={
                             <Switch
                                 checked={viewMode === '2D'}
-                                onChange={handleViewModeChange}
+                                onChange={(event) => setViewMode(event.target.checked ? '2D' : '3D')}
                                 color="primary"
                             />
                         }
@@ -98,7 +96,7 @@ function DashboardLayout({ pointCloudData, userLogs, onFileUpload }) {
                     />
                 </Box>
                 
-                {pointCloudData && (
+                {fileData && (
                     <Box className="dashboard__file-info-container"
                         sx={{ 
                             flex: 1,
@@ -116,7 +114,7 @@ function DashboardLayout({ pointCloudData, userLogs, onFileUpload }) {
                         >
                             File Information
                         </Typography>
-                        <FileInfo fileData={pointCloudData} />
+                        <FileInfo fileData={fileData} />
                     </Box>
                 )}
             </Box>
@@ -158,12 +156,12 @@ function DashboardLayout({ pointCloudData, userLogs, onFileUpload }) {
                         {viewMode === '3D' ? (
                             <ThreeDViewer 
                                 key="3d" 
-                                pointCloudData={pointCloudData?.pointCloud} 
+                                fileData={fileData} 
                             />
                         ) : (
                             <MapViewer 
                                 key="2d" 
-                                geoData={pointCloudData?.geoJson}
+                                geoData={fileData?.geoJson}
                             />
                         )}
                     </Box>
@@ -177,21 +175,6 @@ function DashboardLayout({ pointCloudData, userLogs, onFileUpload }) {
 }
 
 DashboardLayout.propTypes = {
-    pointCloudData: PropTypes.shape({
-        file: PropTypes.shape({
-            name: PropTypes.string.isRequired,
-            size: PropTypes.number.isRequired
-        }).isRequired,
-        pointCloud: PropTypes.oneOfType([
-            PropTypes.arrayOf(PropTypes.shape({
-                x: PropTypes.number.isRequired,
-                y: PropTypes.number.isRequired,
-                z: PropTypes.number.isRequired
-            })),
-            PropTypes.object
-        ]),
-        geoJson: PropTypes.any
-    }),
     userLogs: PropTypes.arrayOf(PropTypes.string).isRequired,
     onFileUpload: PropTypes.func.isRequired
 };

@@ -17,6 +17,8 @@
     "@emotion/styled": "^11.14.0",
     "@mui/icons-material": "^6.4.1",
     "@mui/material": "^6.4.1",
+    "@react-three/drei": "^9.121.3",
+    "@react-three/fiber": "^8.17.12",
     "deck.gl": "^9.1.0",
     "mapbox-gl": "^3.9.3",
     "react": "^18.3.1",

@@ -2,12 +2,13 @@ import React, { useRef, useMemo, useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, Stats } from '@react-three/drei';
+import { useControls } from 'leva';
 import * as THREE from 'three';
 import './styles.css';
 
-function PointCloud({ points }) {
+function PointCloud({ points, pointRadius, pointColor, opacity, sizeAttenuation, scale }) {
     console.log('Rendering points:', points?.length);
-    
+
     const { positions, colors } = useMemo(() => {
         if (!points || !points.length) {
             return { 
@@ -25,13 +26,13 @@ function PointCloud({ points }) {
                 maxY: Math.max(acc.maxY, point.y),
                 minZ: Math.min(acc.minZ, point.z),
                 maxZ: Math.max(acc.maxZ, point.z)
-            }),
-            {
-                minX: Infinity, maxX: -Infinity,
-                minY: Infinity, maxY: -Infinity,
-                minZ: Infinity, maxZ: -Infinity
-            }
-        );
+      }),
+      {
+        minX: Infinity, maxX: -Infinity,
+        minY: Infinity, maxY: -Infinity,
+        minZ: Infinity, maxZ: -Infinity
+      }
+    );
 
         // Calculate center for X and Z only (we want Y to start from 0)
         const center = {
@@ -48,23 +49,22 @@ function PointCloud({ points }) {
         const colorsArray = [];
 
         points.forEach(point => {
-            // Center X and Z, swap Y and Z (Y becomes up), and ensure Y starts from 0
+            // Apply scaling to centered coordinates
+            const scaledX = (point.x - center.x) * scale;
+            const scaledY = (point.y - center.y) * scale;
+            const scaledZ = (point.z - center.z) * scale;
+            
             positionsArray.push(
-                point.x - center.x,           // Center X
-                point.z - bounds.minZ,        // Y becomes Z, shifted to start from 0
-                point.y - center.y            // Z becomes Y, centered
+                scaledX,           // Scaled X
+                scaledY,          // Scaled Y
+                scaledZ           // Scaled Z
             );
 
-            // Calculate normalized height for color (now using Y-up coordinate)
+            // Calculate normalized height for color
             const normalizedHeight = (point.z - bounds.minZ) / (bounds.maxZ - bounds.minZ);
-            
-            // Convert to hue (rainbow colors)
             const hue = normalizedHeight * 0.8;
-            
-            // Convert HSL to RGB
             const color = new THREE.Color();
             color.setHSL(hue, 1, 0.5);
-            
             colorsArray.push(color.r, color.g, color.b);
         });
 
@@ -72,7 +72,7 @@ function PointCloud({ points }) {
             positions: new Float32Array(positionsArray),
             colors: new Float32Array(colorsArray)
         };
-    }, [points]);
+    }, [points, scale]);
 
     const geometry = useMemo(() => {
         const geo = new THREE.BufferGeometry();
@@ -84,14 +84,16 @@ function PointCloud({ points }) {
     }, [positions, colors]);
 
     const pointsMaterial = useMemo(() => {
-        return new THREE.PointsMaterial({
-            size: 0.015,
-            sizeAttenuation: true,
-            vertexColors: true,
-            transparent: false,
-            opacity: 1
+        const material = new THREE.PointsMaterial({
+            size: pointRadius,
+            sizeAttenuation: sizeAttenuation,
+            vertexColors: !pointColor,
+            ...(pointColor ? { color: new THREE.Color(pointColor) } : {}),
+            transparent: true,
+            opacity: opacity
         });
-    }, []);
+        return material;
+    }, [pointRadius, pointColor, opacity, sizeAttenuation]);
 
     return positions.length > 0 ? (
         <primitive object={new THREE.Points(geometry, pointsMaterial)} />
@@ -103,13 +105,93 @@ PointCloud.propTypes = {
         x: PropTypes.number.isRequired,
         y: PropTypes.number.isRequired,
         z: PropTypes.number.isRequired
-    }))
+    })),
+    pointRadius: PropTypes.number.isRequired,
+    pointColor: PropTypes.string,
+    opacity: PropTypes.number.isRequired,
+    sizeAttenuation: PropTypes.bool.isRequired,
+    scale: PropTypes.number.isRequired
 };
 
 function ThreeDViewer({ fileData }) {
     const cameraRef = useRef();
     const [bounds, setBounds] = useState(null);
+    const [pointRadius, setPointRadius] = useState(0.4);
+    const [pointColor, setPointColor] = useState(null);
+    const [opacity, setOpacity] = useState(1);
+    const [sizeAttenuation, setSizeAttenuation] = useState(true);
+    const [scale, setScale] = useState(1.0);
     const pointCloudData = fileData?.pointCloud || [];
+
+    const { 
+        pointSize,
+        pointScale,
+        useVertexColors,
+        color,
+        pointOpacity,
+        enableSizeAttenuation,
+        cameraFOV,
+        backgroundColor
+    } = useControls({
+        pointSize: {
+            value: 0.4,
+            min: 0.1,
+            max: 5,
+            step: 0.1,
+            label: 'Point Size'
+        },
+        pointScale: {
+            value: 1.0,
+            min: 0.1,
+            max: 10,
+            step: 0.1,
+            label: 'Scale'
+        },
+        useVertexColors: {
+            value: true,
+            label: 'Use Height Colors'
+        },
+        color: {
+            value: '#ffffff',
+            label: 'Point Color',
+            render: (get) => !get('useVertexColors')
+        },
+        pointOpacity: {
+            value: 1,
+            min: 0,
+            max: 1,
+            step: 0.1,
+            label: 'Opacity'
+        },
+        enableSizeAttenuation: {
+            value: true,
+            label: 'Size Perspective'
+        },
+        cameraFOV: {
+            value: 50,
+            min: 20,
+            max: 120,
+            step: 1,
+            label: 'Field of View'
+        },
+        backgroundColor: {
+            value: '#000000',
+            label: 'Background'
+        }
+        });
+
+    // Sync all controls with state
+    useEffect(() => {
+        setPointRadius(pointSize);
+        setPointColor(useVertexColors ? null : color);
+        setOpacity(pointOpacity);
+        setSizeAttenuation(enableSizeAttenuation);
+        setScale(pointScale);
+        if (cameraRef.current) {
+            cameraRef.current.fov = cameraFOV;
+            cameraRef.current.updateProjectionMatrix();
+        }
+    }, [pointSize, useVertexColors, color, pointOpacity, enableSizeAttenuation, pointScale, cameraFOV]);
 
     useEffect(() => {
         console.log('FileData received:', fileData);
@@ -146,18 +228,19 @@ function ThreeDViewer({ fileData }) {
     }, [bounds]);
 
     return (
-        <div style={{ width: '100%', height: '100%', background: '#000000' }}>
+        <div style={{ width: '100%', height: '100%', background: backgroundColor, position: 'relative' }}>
             <Canvas
-                camera={{ position: cameraPosition, fov: 45 }}  // 减小FOV使视角更自然
-                gl={{ antialias: true }}
-                style={{ background: '#000000' }}
+                camera={{ position: cameraPosition, fov: cameraFOV }}
+                gl={{ antialias: true, preserveDrawingBuffer:true }}
+                style={{ background: backgroundColor }}
             >
                 <Stats />
                 <PerspectiveCamera
                     ref={cameraRef}
                     makeDefault
                     position={cameraPosition}
-                    fov={50}
+                    fov={cameraFOV}
+                    aspect={window.innerWidth / window.innerHeight}
                     near={0.1}
                     far={10000}
                 />
@@ -171,7 +254,14 @@ function ThreeDViewer({ fileData }) {
                 />
                 <ambientLight intensity={0.8} />
                 <directionalLight position={[10, 10, 5]} intensity={1} />
-                <PointCloud points={pointCloudData} />
+                <PointCloud 
+                    points={pointCloudData} 
+                    pointRadius={pointRadius}
+                    pointColor={pointColor}
+                    opacity={opacity}
+                    sizeAttenuation={sizeAttenuation}
+                    scale={scale}
+                />
                 <gridHelper args={[100, 100]} />
                 <axesHelper args={[50]} />
             </Canvas>
@@ -186,9 +276,9 @@ ThreeDViewer.propTypes = {
             size: PropTypes.number.isRequired
         }).isRequired,
         pointCloud: PropTypes.arrayOf(PropTypes.shape({
-            x: PropTypes.number.isRequired,
-            y: PropTypes.number.isRequired,
-            z: PropTypes.number.isRequired
+    x: PropTypes.number.isRequired,
+    y: PropTypes.number.isRequired,
+    z: PropTypes.number.isRequired
         })),
         geoJson: PropTypes.any
     })

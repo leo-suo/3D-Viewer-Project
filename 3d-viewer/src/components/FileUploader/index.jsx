@@ -57,7 +57,9 @@ function FileUploader({ onFileUpload }) {
             if (file.name.endsWith('.json')) {
                 Data = JSON.parse(text);
             } else if (file.name.endsWith('.xyz') || file.name.endsWith('.txt')) {
-                Data = text.trim().split('\n').map(line => {
+                Data = text.trim().split('\n').filter(line => {
+                    return !line.trim().startsWith('#') && line.trim().length > 0;
+                }).map(line => {
                     const [x, y, z] = line.trim().split(/\s+/).map(Number);
                     return { x, y, z };
                 });

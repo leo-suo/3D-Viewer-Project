@@ -5,113 +5,148 @@ import { Box, Typography } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import './styles.css';
 import { useState } from 'react';
+import * as THREE from 'three';
+import { PCDLoader } from 'three/examples/jsm/loaders/PCDLoader';
 
-function FileUploader({ onFileUpload }) {
-    const [numberOfPoints, setNumberOfPoints] = useState(0);
+function FileUploader({ onFileLoad }) {
+    const [loading, setLoading] = useState(false);
 
-    const calculateBoundingBox = async (fileUrl) => {
-        const response = await fetch(fileUrl);
-        const text = await response.text();
-        const lines = text.trim().split('\n');
-        let numOfPoints = 0;
+    const calculateBounds = (points) => {
+        let minX = Infinity, maxX = -Infinity;
+        let minY = Infinity, maxY = -Infinity;
+        let minZ = Infinity, maxZ = -Infinity;
 
-        // Parse point data
-        for (let i = 0; i < lines.length; i++) {
-            const line = lines[i].trim();
-            if (line === '') continue;
-
-            if (line.startsWith('POINTS')) {
-                console.log(parseInt(line.split(' ')[1]))
-                numOfPoints = parseInt(line.split(' ')[1]);
-                break;
+        // For XYZ array of point objects
+        if (Array.isArray(points)) {
+            points.forEach(point => {
+                minX = Math.min(minX, point.x);
+                maxX = Math.max(maxX, point.x);
+                minY = Math.min(minY, point.y);
+                maxY = Math.max(maxY, point.y);
+                minZ = Math.min(minZ, point.z);
+                maxZ = Math.max(maxZ, point.z);
+            });
+        } 
+        // For PCD buffer geometry
+        else if (points instanceof THREE.BufferGeometry) {
+            const positions = points.attributes.position.array;
+            for (let i = 0; i < positions.length; i += 3) {
+                minX = Math.min(minX, positions[i]);
+                maxX = Math.max(maxX, positions[i]);
+                minY = Math.min(minY, positions[i + 1]);
+                maxY = Math.max(maxY, positions[i + 1]);
+                minZ = Math.min(minZ, positions[i + 2]);
+                maxZ = Math.max(maxZ, positions[i + 2]);
             }
-            /*
-            const [x, y, z] = line.split(/\s+/).map(Number);
+        }
+
+        return {
+            minX, maxX,
+            minY, maxY,
+            minZ, maxZ
+        };
+    };
+
+    const processXYZFile = async (file) => {
+        const text = await file.text();
+        const lines = text.trim().split('\n');
+        const points = [];
+        
+        for (const line of lines) {
+            const [x, y, z] = line.trim().split(/\s+/).map(Number);
             if (!isNaN(x) && !isNaN(y) && !isNaN(z)) {
                 points.push({ x, y, z });
             }
-                */
         }
-        return numOfPoints
-        /*
-        // Calculate bounding box
-        const minX = Math.min(...points.map(p => p.x));
-        const maxX = Math.max(...points.map(p => p.x));
-        const minY = Math.min(...points.map(p => p.y));
-        const maxY = Math.max(...points.map(p => p.y));
-        const minZ = Math.min(...points.map(p => p.z));
-        const maxZ = Math.max(...points.map(p => p.z));
 
+        const bounds = calculateBounds(points);
+        
         return {
-            width: maxX - minX,
-            height: maxY - minY,
-            depth: maxZ - minZ,
-            min: { x: minX, y: minY, z: minZ },
-            max: { x: maxX, y: maxY, z: maxZ },
-            numberOfPoints: points.length
-        }*/;
+            data: points,
+            bounds,
+            numPoints: points.length
+        };
+    };
+
+    const processPCDFile = async (file) => {
+        return new Promise((resolve, reject) => {
+            const loader = new PCDLoader();
+            const url = URL.createObjectURL(file);
+
+            loader.load(url, (pcd) => {
+                const bounds = calculateBounds(pcd.geometry);
+                const numPoints = pcd.geometry.attributes.position.count;
+
+                resolve({
+                    data: url,
+                    bounds,
+                    numPoints
+                });
+            }, undefined, (error) => {
+                URL.revokeObjectURL(url);
+                reject(error);
+            });
+        });
     };
 
     const onDrop = useCallback(async (acceptedFiles) => {
+        if (acceptedFiles.length === 0) return;
+
+        setLoading(true);
         const file = acceptedFiles[0];
-        if (!file) return;
 
         try {
-            let Data;
-            let numOfPoints = 0;
+            let pointCloudData = {
+                pcd: null,
+                xyz: null,
+                bounds: null,
+                numPoints: 0
+            };
 
-            if (file.name.endsWith('.json')) {
-                const text = await file.text();
-                Data = JSON.parse(text);
-            } else if (file.name.endsWith('.xyz') || file.name.endsWith('.txt')) {
-                const text = await file.text();
-                Data = text.trim().split('\n').filter(line => {
-                    return !line.trim().startsWith('#') && line.trim().length > 0;
-                }).map(line => {
-                    const [x, y, z] = line.trim().split(/\s+/).map(Number);
-                    return { x, y, z };
-                });
-            } else if (file.name.endsWith('.pcd')) {
-                const fileUrl = URL.createObjectURL(file);
-                Data = fileUrl; // Store the URL instead of parsed data
-                numOfPoints = await calculateBoundingBox(fileUrl);
-            } else if (file.name.endsWith('.geojson')) {
-                const text = await file.text();
-                Data = JSON.parse(text);
-            }
-
-            if (Data) {
-                console.log(`Loaded data from ${file.name}`);
-                const fileData = {
-                    file: {
-                        name: file.name,
-                        size: file.size,
-                        points: numOfPoints
-                    },
-                    pointCloud: {
-                        pcd: file.name.endsWith('.pcd') ? Data : '', // Use the file URL for PCD
-                        xyz: file.name.endsWith('.xyz') ? Data : []
-                    },
-                    geoJson: file.name.endsWith('.geojson') ? Data : null
+            if (file.name.toLowerCase().endsWith('.xyz')) {
+                const result = await processXYZFile(file);
+                pointCloudData = {
+                    xyz: result.data,
+                    pcd: null,
+                    bounds: result.bounds,
+                    numPoints: result.numPoints
                 };
-                console.log('Sending fileData:', fileData);
-                onFileUpload(fileData);
-            } else {
-                throw new Error('No valid point cloud data found in file.');
+            } 
+            else if (file.name.toLowerCase().endsWith('.pcd')) {
+                const result = await processPCDFile(file);
+                pointCloudData = {
+                    pcd: result.data,
+                    xyz: null,
+                    bounds: result.bounds,
+                    numPoints: result.numPoints
+                };
             }
+
+            const fileData = {
+                file: {
+                    name: file.name,
+                    size: file.size
+                },
+                pointCloud: pointCloudData,
+                geoJson: file.name.endsWith('.geojson') ? 
+                    JSON.parse(await file.text()) : null
+            };
+
+            onFileLoad(fileData);
         } catch (error) {
             console.error('Error processing file:', error);
-            alert('Error processing file. Please ensure it\'s a valid point cloud file.');
+        } finally {
+            setLoading(false);
         }
-    }, [onFileUpload]);
+    }, [onFileLoad]);
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
         onDrop,
         accept: {
-            'application/json': ['.json', '.geojson'],
-            'text/plain': ['.xyz', '.txt', '.pcd']
-        },
-        multiple: false
+            'application/json': ['.geojson'],
+            'text/plain': ['.xyz'],
+            'application/octet-stream': ['.pcd']
+        }
     });
 
     return (
@@ -168,7 +203,7 @@ function FileUploader({ onFileUpload }) {
 }
 
 FileUploader.propTypes = {
-    onFileUpload: PropTypes.func.isRequired
+    onFileLoad: PropTypes.func.isRequired
 };
 
 export default FileUploader;

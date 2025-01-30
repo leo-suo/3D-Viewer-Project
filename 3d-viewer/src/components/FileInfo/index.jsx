@@ -1,96 +1,83 @@
+import React from 'react';
 import PropTypes from 'prop-types';
-import { Card, Box, Typography } from '@mui/material';
+import { Box, Typography, Paper } from '@mui/material';
+import { formatFileSize } from '../../utils/formatters';
 
 function FileInfo({ fileData }) {
     if (!fileData) return null;
 
-    const { file, pointCloud, geoJson } = fileData;
-    /*
-    const bounds = calculateBounds(pointCloud);
-    */
-    
-    const formatFileSize = (bytes) => {
-        if (bytes === 0) return '0 Bytes';
-        const k = 1024;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-    };
-
-    const formatDimension = (value) => value.toFixed(2);
-
-    /*
-    const dimensions = {
-        x: formatDimension(bounds.maxX - bounds.minX),
-        y: formatDimension(bounds.maxY - bounds.minY),
-        z: formatDimension(bounds.maxZ - bounds.minZ)
-    };
-    */
+    const { file, pointCloud } = fileData;
+    const isPointCloud = pointCloud?.xyz || pointCloud?.pcd;
+    const bounds = pointCloud?.bounds;
 
     return (
-        <Card sx={{ p: 2 }}>
-            <Box sx={{ fontFamily: 'monospace' }}>
-                <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-                    Filename:
+        <Paper 
+            elevation={2}
+            sx={{
+                p: 2,
+                bgcolor: 'background.paper',
+                borderRadius: 1
+            }}
+        >
+            <Typography variant="h6" gutterBottom>
+                File Information
+            </Typography>
+            
+            <Box sx={{ mb: 2 }}>
+                <Typography variant="body2" color="text.secondary">
+                    Name: {file.name}
                 </Typography>
-                <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', pl: 3 }}>
-                    {file.name}
+                <Typography variant="body2" color="text.secondary">
+                    Size: {formatFileSize(file.size)}
                 </Typography>
-                <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', mt: 1 }}>
-                    File size:
-                </Typography>
-                <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', pl: 3 }}>
-                    {formatFileSize(file.size)}
-                </Typography>
-                <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', mt: 1 }}>
-                    Points:
-                </Typography>
-                <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', pl: 3 }}>
-                    {file.points}
-                </Typography>
+                {isPointCloud && pointCloud.numPoints > 0 && (
+                    <Typography variant="body2" color="text.secondary">
+                        Points: {pointCloud.numPoints.toLocaleString()}
+                    </Typography>
+                )}
             </Box>
-        </Card>
+
+            {bounds && (
+                <Box>
+                    <Typography variant="subtitle2" gutterBottom>
+                        Bounds:
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                        X: {bounds.minX.toFixed(2)} to {bounds.maxX.toFixed(2)}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                        Y: {bounds.minY.toFixed(2)} to {bounds.maxY.toFixed(2)}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                        Z: {bounds.minZ.toFixed(2)} to {bounds.maxZ.toFixed(2)}
+                    </Typography>
+                </Box>
+            )}
+        </Paper>
     );
 }
-
-/*
-function calculateBounds(points) {
-    if (!points || points.length === 0) {
-        return {
-            minX: 0, maxX: 0,
-            minY: 0, maxY: 0,
-            minZ: 0, maxZ: 0
-        };
-    }
-
-    return points.reduce((bounds, point) => ({
-        minX: Math.min(bounds.minX, point.x),
-        maxX: Math.max(bounds.maxX, point.x),
-        minY: Math.min(bounds.minY, point.y),
-        maxY: Math.max(bounds.maxY, point.y),
-        minZ: Math.min(bounds.minZ, point.z),
-        maxZ: Math.max(bounds.maxZ, point.z)
-    }), {
-        minX: Infinity, maxX: -Infinity,
-        minY: Infinity, maxY: -Infinity,
-        minZ: Infinity, maxZ: -Infinity
-    });
-}
-    */
 
 FileInfo.propTypes = {
     fileData: PropTypes.shape({
         file: PropTypes.shape({
             name: PropTypes.string.isRequired,
-            size: PropTypes.number.isRequired,
-            points: PropTypes.number.isRequired
+            size: PropTypes.number.isRequired
         }).isRequired,
         pointCloud: PropTypes.shape({
-            pcd: PropTypes.string.isRequired,
-            xyz: PropTypes.array.isRequired
-        }).isRequired,
-        geoJson: PropTypes.object
-    }).isRequired
+            pcd: PropTypes.any,
+            xyz: PropTypes.array,
+            bounds: PropTypes.shape({
+                minX: PropTypes.number,
+                maxX: PropTypes.number,
+                minY: PropTypes.number,
+                maxY: PropTypes.number,
+                minZ: PropTypes.number,
+                maxZ: PropTypes.number
+            }),
+            numPoints: PropTypes.number
+        }),
+        geoJson: PropTypes.any
+    })
 };
 
 export default FileInfo; 

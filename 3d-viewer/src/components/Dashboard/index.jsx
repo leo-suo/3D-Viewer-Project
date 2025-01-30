@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import PropTypes from 'prop-types';
-import { Box, Typography, FormControlLabel, Switch } from '@mui/material';
+import { Box, Typography, FormControlLabel, Switch, Grid } from '@mui/material';
 import FileUploader from '../FileUploader';
 import ThreeDViewer from '../ThreeDViewer';
 import MapViewer from '../MapViewer';
@@ -12,8 +12,10 @@ function DashboardLayout({ userLogs, onFileUpload }) {
     const [viewMode, setViewMode] = useState('3D');
     const [fileData, setFileData] = useState(null);
 
-    const handleFileUpload = (data) => {
-        console.log('Dashboard received fileData:', data);
+    const onFileLoad = (data) => {
+        console.log('File loaded:', data);
+        setFileData(data);
+        
         // Automatically switch view mode based on file type
         const fileExtension = data.file.name.split('.').pop().toLowerCase();
         if (fileExtension === 'geojson') {
@@ -22,8 +24,10 @@ function DashboardLayout({ userLogs, onFileUpload }) {
             setViewMode('3D');
         }
         
-        setFileData(data);
-        onFileUpload(data);
+        // Call the parent's onFileUpload if it exists
+        if (onFileUpload) {
+            onFileUpload(data);
+        }
     };
 
     return (
@@ -59,7 +63,7 @@ function DashboardLayout({ userLogs, onFileUpload }) {
                         flexShrink: 0,
                         width: { xs: '50%', md: '100%' }
                     }}>
-                    <FileUploader onFileUpload={handleFileUpload} />
+                    <FileUploader onFileLoad={onFileLoad} />
                 </Box>
                 
                 {/* View Mode Switch */}

@@ -4,46 +4,52 @@ import { useDropzone } from 'react-dropzone';
 import { Box, Typography } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import './styles.css';
+import { useState } from 'react';
 
 function FileUploader({ onFileUpload }) {
-    const parsePCDFile = async (text) => {
+    const [numberOfPoints, setNumberOfPoints] = useState(0);
+
+    const calculateBoundingBox = async (fileUrl) => {
+        const response = await fetch(fileUrl);
+        const text = await response.text();
         const lines = text.trim().split('\n');
-        let headerLength = 0;
-        let pointDataStart = false;
-        let format = 'ascii'; // default format
-        const points = [];
-
-        // Parse header
-        for (let i = 0; i < lines.length; i++) {
-            const line = lines[i].trim();
-            headerLength++;
-
-            if (line.startsWith('FORMAT')) {
-                format = line.split(/\s+/)[1];
-            }
-
-            if (line === 'DATA ascii') {
-                pointDataStart = true;
-                break;
-            }
-        }
-
-        if (!pointDataStart) {
-            throw new Error('Unsupported PCD format. Only ASCII format is supported.');
-        }
+        let numOfPoints = 0;
 
         // Parse point data
-        for (let i = headerLength; i < lines.length; i++) {
+        for (let i = 0; i < lines.length; i++) {
             const line = lines[i].trim();
             if (line === '') continue;
 
+            if (line.startsWith('POINTS')) {
+                console.log(parseInt(line.split(' ')[1]))
+                numOfPoints = parseInt(line.split(' ')[1]);
+                break;
+            }
+            /*
             const [x, y, z] = line.split(/\s+/).map(Number);
             if (!isNaN(x) && !isNaN(y) && !isNaN(z)) {
                 points.push({ x, y, z });
             }
+                */
         }
+        return numOfPoints
+        /*
+        // Calculate bounding box
+        const minX = Math.min(...points.map(p => p.x));
+        const maxX = Math.max(...points.map(p => p.x));
+        const minY = Math.min(...points.map(p => p.y));
+        const maxY = Math.max(...points.map(p => p.y));
+        const minZ = Math.min(...points.map(p => p.z));
+        const maxZ = Math.max(...points.map(p => p.z));
 
-        return points;
+        return {
+            width: maxX - minX,
+            height: maxY - minY,
+            depth: maxZ - minZ,
+            min: { x: minX, y: minY, z: minZ },
+            max: { x: maxX, y: maxY, z: maxZ },
+            numberOfPoints: points.length
+        }*/;
     };
 
     const onDrop = useCallback(async (acceptedFiles) => {
@@ -51,12 +57,14 @@ function FileUploader({ onFileUpload }) {
         if (!file) return;
 
         try {
-            const text = await file.text();
             let Data;
+            let numOfPoints = 0;
 
             if (file.name.endsWith('.json')) {
+                const text = await file.text();
                 Data = JSON.parse(text);
             } else if (file.name.endsWith('.xyz') || file.name.endsWith('.txt')) {
+                const text = await file.text();
                 Data = text.trim().split('\n').filter(line => {
                     return !line.trim().startsWith('#') && line.trim().length > 0;
                 }).map(line => {
@@ -64,19 +72,26 @@ function FileUploader({ onFileUpload }) {
                     return { x, y, z };
                 });
             } else if (file.name.endsWith('.pcd')) {
-                Data = await parsePCDFile(text);
+                const fileUrl = URL.createObjectURL(file);
+                Data = fileUrl; // Store the URL instead of parsed data
+                numOfPoints = await calculateBoundingBox(fileUrl);
             } else if (file.name.endsWith('.geojson')) {
+                const text = await file.text();
                 Data = JSON.parse(text);
             }
 
             if (Data) {
-                console.log(`Loaded ${Data.length} points from ${file.name}`);
+                console.log(`Loaded data from ${file.name}`);
                 const fileData = {
                     file: {
                         name: file.name,
-                        size: file.size
+                        size: file.size,
+                        points: numOfPoints
                     },
-                    pointCloud: file.name.endsWith('.pcd') || file.name.endsWith('.xyz') ? Data : [],
+                    pointCloud: {
+                        pcd: file.name.endsWith('.pcd') ? Data : '', // Use the file URL for PCD
+                        xyz: file.name.endsWith('.xyz') ? Data : []
+                    },
                     geoJson: file.name.endsWith('.geojson') ? Data : null
                 };
                 console.log('Sending fileData:', fileData);

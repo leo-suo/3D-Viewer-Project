@@ -2,77 +2,78 @@ import React, { useRef, useMemo, useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, Stats } from '@react-three/drei';
-import { useControls } from 'leva';
+import { useControls, folder } from 'leva';
 import * as THREE from 'three';
+import { PCDLoader } from 'three/examples/jsm/loaders/PCDLoader';
 import './styles.css';
 
-function PointCloud({ points, pointRadius, pointColor, opacity, sizeAttenuation, scale }) {
+function PointCloud({ points, pointRadius, pointColor, opacity, sizeAttenuation, scale, altitudeRange, enableAltitudeFilter }) {
     console.log('Rendering points:', points?.length);
 
     const { positions, colors } = useMemo(() => {
         if (!points || !points.length) {
-            return { 
-                positions: new Float32Array([]),
-                colors: new Float32Array([])
-            };
+            return { positions: new Float32Array([]), colors: new Float32Array([]) };
         }
-        
-        // First pass: calculate bounds in original coordinates
-        const bounds = points.reduce(
-            (acc, point) => ({
-                minX: Math.min(acc.minX, point.x),
-                maxX: Math.max(acc.maxX, point.x),
-                minY: Math.min(acc.minY, point.y),
-                maxY: Math.max(acc.maxY, point.y),
-                minZ: Math.min(acc.minZ, point.z),
-                maxZ: Math.max(acc.maxZ, point.z)
-      }),
-      {
-        minX: Infinity, maxX: -Infinity,
-        minY: Infinity, maxY: -Infinity,
-        minZ: Infinity, maxZ: -Infinity
-      }
-    );
 
-        // Calculate center for X and Z only (we want Y to start from 0)
-        const center = {
-            x: (bounds.minX + bounds.maxX) / 2,
-            z: (bounds.minZ + bounds.maxZ) / 2,
-            y: (bounds.minY + bounds.maxY) / 2
-        };
-        
-        console.log('Bounds:', bounds);
-        console.log('Center:', center);
+        // Step 1: Compute bounding box
+        let minX = Infinity, maxX = -Infinity;
+        let minY = Infinity, maxY = -Infinity;
+        let minZ = Infinity, maxZ = -Infinity;
 
-        // Create positions and colors arrays
+        points.forEach(point => {
+            minX = Math.min(minX, point.x);
+            maxX = Math.max(maxX, point.x);
+            minY = Math.min(minY, point.y);
+            maxY = Math.max(maxY, point.y);
+            minZ = Math.min(minZ, point.z);
+            maxZ = Math.max(maxZ, point.z);
+        });
+
+        // Step 2: Compute center
+        const centerX = (minX + maxX) / 2;
+        const centerY = (minY + maxY) / 2;
+        const centerZ = (minZ + maxZ) / 2;
+
+        // Step 3: Compute maximum dimension
+        const sizeX = maxX - minX;
+        const sizeY = maxY - minY;
+        const sizeZ = maxZ - minZ;
+        const maxDimension = Math.max(sizeX, sizeY, sizeZ);
+        
+        // Set scale factor
+        const targetSize = 10;
+        const scaleFactor = maxDimension > 0 ? targetSize / maxDimension : 1;
+
+        console.log("XYZ Bounding Box:", { minX, maxX, minY, maxY, minZ, maxZ });
+        console.log("XYZ Center:", { centerX, centerY, centerZ });
+        console.log("XYZ Scale Factor:", scaleFactor);
+
+        // Filter and transform points
         const positionsArray = [];
         const colorsArray = [];
 
         points.forEach(point => {
-            // Apply scaling to centered coordinates
-            const scaledX = (point.x - center.x) * scale;
-            const scaledY = (point.y - center.y) * scale;
-            const scaledZ = (point.z - center.z) * scale;
-            
-            positionsArray.push(
-                scaledX,           // Scaled X
-                scaledY,          // Scaled Y
-                scaledZ           // Scaled Z
-            );
+            const y = (point.y - centerY) * scaleFactor;
+            if (!enableAltitudeFilter || (y >= altitudeRange.min && y <= altitudeRange.max)) {
+                positionsArray.push(
+                    (point.x - centerX) * scaleFactor,
+                    y,
+                    (point.z - centerZ) * scaleFactor
+                );
 
-            // Calculate normalized height for color
-            const normalizedHeight = (point.z - bounds.minZ) / (bounds.maxZ - bounds.minZ);
-            const hue = normalizedHeight * 0.8;
-            const color = new THREE.Color();
-            color.setHSL(hue, 1, 0.5);
-            colorsArray.push(color.r, color.g, color.b);
+                const normalizedHeight = (point.y - minY) / (maxY - minY);
+                const hue = normalizedHeight * 0.8;
+                const color = new THREE.Color();
+                color.setHSL(hue, 1, 0.5);
+                colorsArray.push(color.r, color.g, color.b);
+            }
         });
 
         return {
             positions: new Float32Array(positionsArray),
             colors: new Float32Array(colorsArray)
         };
-    }, [points, scale]);
+    }, [points, altitudeRange, enableAltitudeFilter]);
 
     const geometry = useMemo(() => {
         const geo = new THREE.BufferGeometry();
@@ -110,7 +111,12 @@ PointCloud.propTypes = {
     pointColor: PropTypes.string,
     opacity: PropTypes.number.isRequired,
     sizeAttenuation: PropTypes.bool.isRequired,
-    scale: PropTypes.number.isRequired
+    scale: PropTypes.number.isRequired,
+    altitudeRange: PropTypes.shape({
+        min: PropTypes.number.isRequired,
+        max: PropTypes.number.isRequired
+    }),
+    enableAltitudeFilter: PropTypes.bool.isRequired
 };
 
 function ThreeDViewer({ fileData }) {
@@ -121,7 +127,10 @@ function ThreeDViewer({ fileData }) {
     const [opacity, setOpacity] = useState(1);
     const [sizeAttenuation, setSizeAttenuation] = useState(true);
     const [scale, setScale] = useState(1.0);
-    const pointCloudData = fileData?.pointCloud || [];
+    const [pointCloudData, setPointCloudData] = useState([]);
+    const [pcdPoints, setPcdPoints] = useState(null);
+    const [altitudeRange, setAltitudeRange] = useState({ min: -Infinity, max: Infinity });
+    const [originalBounds, setOriginalBounds] = useState(null);
 
     const { 
         pointSize,
@@ -131,7 +140,10 @@ function ThreeDViewer({ fileData }) {
         pointOpacity,
         enableSizeAttenuation,
         cameraFOV,
-        backgroundColor
+        backgroundColor,
+        altitudeMin,
+        altitudeMax,
+        enableAltitudeFilter
     } = useControls({
         pointSize: {
             value: 0.4,
@@ -177,8 +189,30 @@ function ThreeDViewer({ fileData }) {
         backgroundColor: {
             value: '#000000',
             label: 'Background'
-        }
-        });
+        },
+        Filtering: folder({
+            enableAltitudeFilter: {
+                value: false,
+                label: 'Enable Altitude Filter'
+            },
+            altitudeMin: {
+                value: originalBounds ? originalBounds.minY : -5,
+                min: originalBounds ? originalBounds.minY : -5,
+                max: originalBounds ? originalBounds.maxY : 5,
+                step: 0.1,
+                label: 'Min Altitude',
+                render: (get) => get('Filtering.enableAltitudeFilter')
+            },
+            altitudeMax: {
+                value: originalBounds ? originalBounds.maxY : 5,
+                min: originalBounds ? originalBounds.minY : -5,
+                max: originalBounds ? originalBounds.maxY : 5,
+                step: 0.1,
+                label: 'Max Altitude',
+                render: (get) => get('Filtering.enableAltitudeFilter')
+            }
+        })
+    });
 
     // Sync all controls with state
     useEffect(() => {
@@ -193,27 +227,194 @@ function ThreeDViewer({ fileData }) {
         }
     }, [pointSize, useVertexColors, color, pointOpacity, enableSizeAttenuation, pointScale, cameraFOV]);
 
+    // Update altitude range when controls change
     useEffect(() => {
-        console.log('FileData received:', fileData);
-        console.log('Point cloud data length:', pointCloudData?.length);
-        
-        if (pointCloudData && pointCloudData.length > 0) {
-            const newBounds = pointCloudData.reduce((acc, point) => ({
-                minX: Math.min(acc.minX, point.x),
-                maxX: Math.max(acc.maxX, point.x),
-                minY: Math.min(acc.minY, point.y),
-                maxY: Math.max(acc.maxY, point.y),
-                minZ: Math.min(acc.minZ, point.z),
-                maxZ: Math.max(acc.maxZ, point.z)
-            }), {
-                minX: Infinity, maxX: -Infinity,
-                minY: Infinity, maxY: -Infinity,
-                minZ: Infinity, maxZ: -Infinity
-            });
-            console.log('Calculated bounds:', newBounds);
-            setBounds(newBounds);
+        if (enableAltitudeFilter) {
+            setAltitudeRange({ min: altitudeMin, max: altitudeMax });
+        } else {
+            setAltitudeRange({ min: -Infinity, max: Infinity });
         }
-    }, [pointCloudData, fileData]);
+    }, [enableAltitudeFilter, altitudeMin, altitudeMax]);
+
+    useEffect(() => {
+        const loadPointCloudData = async () => {
+            if (!fileData) return;
+
+            if (fileData.file.name.toLowerCase().endsWith('.pcd')) {
+                const loader = new PCDLoader();
+                try {
+                    const pcdUrl = fileData.pointCloud.pcd;
+                    if (!pcdUrl) {
+                        console.error('No PCD URL provided');
+                        return;
+                    }
+
+                    const pcdObject = await loader.loadAsync(pcdUrl);
+                    console.log('Loaded PCD:', pcdObject);
+
+                    // Calculate bounds from original geometry
+                    const geometry = pcdObject.geometry;
+                    const positions = geometry.attributes.position.array;
+                    
+                    // Compute bounding box in original coordinates
+                    let minX = Infinity, maxX = -Infinity;
+                    let minY = Infinity, maxY = -Infinity;
+                    let minZ = Infinity, maxZ = -Infinity;
+
+                    for (let i = 0; i < positions.length; i += 3) {
+                        minX = Math.min(minX, positions[i]);
+                        maxX = Math.max(maxX, positions[i]);
+                        minY = Math.min(minY, positions[i + 1]);
+                        maxY = Math.max(maxY, positions[i + 1]);
+                        minZ = Math.min(minZ, positions[i + 2]);
+                        maxZ = Math.max(maxZ, positions[i + 2]);
+                    }
+
+                    // Store original bounds for filtering
+                    setOriginalBounds({ minX, maxX, minY, maxY, minZ, maxZ });
+
+                    // Calculate center and scale for display
+                    const centerX = (minX + maxX) / 2;
+                    const centerY = (minY + maxY) / 2;
+                    const centerZ = (minZ + maxZ) / 2;
+
+                    const maxDimension = Math.max(
+                        maxX - minX,
+                        maxY - minY,
+                        maxZ - minZ
+                    );
+                    
+                    const targetSize = 10;
+                    const scaleFactor = maxDimension > 0 ? targetSize / maxDimension : 1;
+
+                    // Instead of modifying geometry, set object transform
+                    pcdObject.position.set(-centerX, -centerY, -centerZ);
+                    pcdObject.scale.set(scaleFactor, scaleFactor, scaleFactor);
+
+                    setPcdPoints(pcdObject);
+                    setBounds({
+                        minX: -targetSize/2,
+                        maxX: targetSize/2,
+                        minY: -targetSize/2,
+                        maxY: targetSize/2,
+                        minZ: -targetSize/2,
+                        maxZ: targetSize/2
+                    });
+
+                } catch (error) {
+                    console.error('Error loading PCD file:', error);
+                }
+            } else {
+                // Handle XYZ data
+                const xyzData = fileData.pointCloud.xyz;
+                setPointCloudData(Array.isArray(xyzData) ? xyzData : []);
+                setPcdPoints(null);
+            }
+        };
+
+        loadPointCloudData();
+    }, [fileData]);
+
+    // Add this effect to store original geometry when PCD is loaded
+    useEffect(() => {
+        if (pcdPoints && !pcdPoints.originalGeometry) {
+            pcdPoints.originalGeometry = pcdPoints.geometry.clone();
+        }
+    }, [pcdPoints]);
+
+    // Update the PCD material and filtering effect
+    useEffect(() => {
+        if (pcdPoints && pcdPoints.originalGeometry) {
+            const originalPositions = pcdPoints.originalGeometry.attributes.position.array;
+            let currentGeometry;
+            let positions;
+
+            if (!enableAltitudeFilter) {
+                // Use original geometry when filter is disabled
+                currentGeometry = pcdPoints.originalGeometry.clone();
+                positions = currentGeometry.attributes.position.array;
+            } else {
+                // Filter points using original coordinates
+                const filteredPositions = [];
+                
+                for (let i = 0; i < originalPositions.length; i += 3) {
+                    const y = originalPositions[i + 1];
+                    if (y >= altitudeRange.min && y <= altitudeRange.max) {
+                        filteredPositions.push(
+                            originalPositions[i],
+                            originalPositions[i + 1],
+                            originalPositions[i + 2]
+                        );
+                    }
+                }
+
+                currentGeometry = new THREE.BufferGeometry();
+                currentGeometry.setAttribute('position', 
+                    new THREE.Float32BufferAttribute(filteredPositions, 3));
+                positions = currentGeometry.attributes.position.array;
+            }
+
+            // Calculate colors
+            const colors = new Float32Array(positions.length);
+            for (let i = 0; i < positions.length; i += 3) {
+                const y = positions[i + 1];
+                const normalizedHeight = (y - originalBounds.minY) / (originalBounds.maxY - originalBounds.minY);
+                const hue = normalizedHeight * 0.8;
+                const color = new THREE.Color();
+                color.setHSL(hue, 1, 0.5);
+
+                colors[i] = color.r;
+                colors[i + 1] = color.g;
+                colors[i + 2] = color.b;
+            }
+
+            currentGeometry.setAttribute('color',
+                new THREE.Float32BufferAttribute(colors, 3));
+
+            // Update geometry while preserving transforms
+            const position = pcdPoints.position.clone();
+            const scale = pcdPoints.scale.clone();
+            pcdPoints.geometry = currentGeometry;
+            pcdPoints.position.copy(position);
+            pcdPoints.scale.copy(scale);
+
+            // Update material
+            const material = new THREE.PointsMaterial({
+                size: pointRadius,
+                sizeAttenuation: sizeAttenuation,
+                vertexColors: useVertexColors,
+                ...(useVertexColors ? {} : { color: new THREE.Color(color) }),
+                transparent: true,
+                opacity: opacity
+            });
+            
+            pcdPoints.material = material;
+        }
+    }, [pcdPoints, pointRadius, sizeAttenuation, useVertexColors, color, opacity, altitudeRange, enableAltitudeFilter, originalBounds]);
+
+    // Update the altitude range effect
+    useEffect(() => {
+        if (enableAltitudeFilter && originalBounds) {
+            // Update Leva controls range based on original bounds
+            const minY = originalBounds.minY;
+            const maxY = originalBounds.maxY;
+            
+            // Set altitude range based on original bounds
+            setAltitudeRange({ 
+                min: altitudeMin,
+                max: altitudeMax
+            });
+        } else {
+            setAltitudeRange({ min: -Infinity, max: Infinity });
+        }
+    }, [enableAltitudeFilter, altitudeMin, altitudeMax, originalBounds]);
+
+    // Apply scale to PCD object
+    useEffect(() => {
+        if (pcdPoints) {
+            pcdPoints.scale.set(scale, scale, scale);
+        }
+    }, [pcdPoints, scale]);
 
     const cameraPosition = useMemo(() => {
         if (!bounds) return [10, 10, 10];
@@ -226,6 +427,39 @@ function ThreeDViewer({ fileData }) {
         // 调整相机位置到正面视角
         return [maxDim * 2, maxDim * 1.5, maxDim * 2];
     }, [bounds]);
+
+    const renderPointCloud = () => {
+        if (pcdPoints) {
+            // Apply initial material settings to PCD points
+            if (pcdPoints.material) {
+                pcdPoints.material.size = pointRadius;
+                pcdPoints.material.sizeAttenuation = sizeAttenuation;
+                pcdPoints.material.opacity = opacity;
+                pcdPoints.material.transparent = true;
+                if (!useVertexColors) {
+                    pcdPoints.material.color = new THREE.Color(color);
+                    pcdPoints.material.vertexColors = false;
+                } else {
+                    pcdPoints.material.vertexColors = true;
+                }
+            }
+            return <primitive object={pcdPoints} />;
+        } else {
+            // Render XYZ points using our PointCloud component
+            return (
+                <PointCloud 
+                    points={pointCloudData} 
+                    pointRadius={pointRadius}
+                    pointColor={pointColor}
+                    opacity={opacity}
+                    sizeAttenuation={sizeAttenuation}
+                    scale={scale}
+                    altitudeRange={altitudeRange}
+                    enableAltitudeFilter={enableAltitudeFilter}
+                />
+            );
+        }
+    };
 
     return (
         <div style={{ width: '100%', height: '100%', background: backgroundColor, position: 'relative' }}>
@@ -254,14 +488,7 @@ function ThreeDViewer({ fileData }) {
                 />
                 <ambientLight intensity={0.8} />
                 <directionalLight position={[10, 10, 5]} intensity={1} />
-                <PointCloud 
-                    points={pointCloudData} 
-                    pointRadius={pointRadius}
-                    pointColor={pointColor}
-                    opacity={opacity}
-                    sizeAttenuation={sizeAttenuation}
-                    scale={scale}
-                />
+                {renderPointCloud()}
                 <gridHelper args={[100, 100]} />
                 <axesHelper args={[50]} />
             </Canvas>
@@ -273,13 +500,17 @@ ThreeDViewer.propTypes = {
     fileData: PropTypes.shape({
         file: PropTypes.shape({
             name: PropTypes.string.isRequired,
-            size: PropTypes.number.isRequired
+            size: PropTypes.number.isRequired,
+            points: PropTypes.number
         }).isRequired,
-        pointCloud: PropTypes.arrayOf(PropTypes.shape({
-    x: PropTypes.number.isRequired,
-    y: PropTypes.number.isRequired,
-    z: PropTypes.number.isRequired
-        })),
+        pointCloud: PropTypes.shape({
+            pcd: PropTypes.any, // Can be binary data or string
+            xyz: PropTypes.arrayOf(PropTypes.shape({
+                x: PropTypes.number.isRequired,
+                y: PropTypes.number.isRequired,
+                z: PropTypes.number.isRequired
+            }))
+        }),
         geoJson: PropTypes.any
     })
 };

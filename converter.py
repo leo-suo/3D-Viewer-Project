@@ -19,7 +19,7 @@ def convert_pcd_to_ascii(input_pcd_path, output_pcd_path):
 
 
 # Example usage
-input_pcd_file = "learn13.pcd"  # Input binary compressed PCD file
-output_pcd_file = "learn13-ascii.pcd"  # Output ASCII PCD file
+input_pcd_file = "dragon.pcd"  # Input binary compressed PCD file
+output_pcd_file = "dragon-ascii.pcd"  # Output ASCII PCD file
 
 convert_pcd_to_ascii(input_pcd_file, output_pcd_file)

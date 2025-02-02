@@ -94,7 +94,7 @@ function FileUploader({ onFileLoad }) {
 
         setLoading(true);
         const file = acceptedFiles[0];
-
+        console.log(file.name);
         try {
             let pointCloudData = {
                 pcd: null,
@@ -128,8 +128,9 @@ function FileUploader({ onFileLoad }) {
                     size: file.size
                 },
                 pointCloud: pointCloudData,
-                geoJson: file.name.endsWith('.geojson') ? 
-                    JSON.parse(await file.text()) : null
+                geoJson: file.name.toLowerCase().endsWith('.geojson') || 
+                        file.name.toLowerCase().endsWith('.json') ? 
+                        JSON.parse(await file.text()) : null
             };
 
             onFileLoad(fileData);

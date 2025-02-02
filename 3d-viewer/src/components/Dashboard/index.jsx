@@ -18,7 +18,7 @@ function DashboardLayout({ userLogs, onFileUpload }) {
         
         // Automatically switch view mode based on file type
         const fileExtension = data.file.name.split('.').pop().toLowerCase();
-        if (fileExtension === 'geojson') {
+        if (fileExtension === 'geojson' || fileExtension === 'json') {
             setViewMode('2D');
         } else if (['xyz', 'pcd'].includes(fileExtension)) {
             setViewMode('3D');

@@ -8,7 +8,7 @@ import { Box, Typography } from '@mui/material';
 // Mapbox API Key
 const MAPBOX_TOKEN = 'pk.eyJ1IjoibGVvc3VvIiwiYSI6ImNtNmJhbzhxMDA2bmkyam84ejh3dngyZWkifQ.GIxeZlnIerRey6wNUQmiCQ';
 
-function MapViewer({ geoData }) {
+function MapViewer({ geoData, onLogActivity }) {
     const deckRef = useRef(null);
     const mapRef = useRef(null);
     const [mapError, setMapError] = useState(false);
@@ -120,6 +120,13 @@ function MapViewer({ geoData }) {
         ];
     }, [geoData]);
 
+    // Add logging to view state changes
+    const onViewStateChange = ({ viewState }) => {
+        setViewState(viewState);
+        // Debounce this to avoid too many logs
+        onLogActivity(`Map view updated: zoom ${viewState.zoom.toFixed(1)}`);
+    };
+
     return (
         <Box className='map-viewer' sx={{ position: 'relative', width: '100%', height: '100%' }}>
             {mapError && (
@@ -146,12 +153,17 @@ function MapViewer({ geoData }) {
                 initialViewState={viewState}
                 controller={true}
                 layers={layers}
-                onViewStateChange={({ viewState }) => setViewState(viewState)}
+                onViewStateChange={onViewStateChange}
                 style={{ position: 'relative', width: '100%', height: '100%' }}
                 getCursor={({isDragging, isHovering}) => {
                     if (isHovering) return 'default'
                     if (isDragging) return 'grabbing'
                     return 'grab'
+                }}
+                onClick={(info) => {
+                    if (info.object) {
+                        onLogActivity(`Selected feature: ${info.object.geometry.type}`);
+                    }
                 }}
             >
                 <Map
@@ -223,7 +235,8 @@ MapViewer.propTypes = {
                 properties: PropTypes.object.isRequired
             })
         ).isRequired
-    }).isRequired
+    }).isRequired,
+    onLogActivity: PropTypes.func.isRequired
 };
 
 export default MapViewer;

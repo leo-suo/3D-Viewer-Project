@@ -8,7 +8,7 @@ import { useState } from 'react';
 import * as THREE from 'three';
 import { PCDLoader } from 'three/examples/jsm/loaders/PCDLoader';
 
-function FileUploader({ onFileLoad }) {
+function FileUploader({ onFileLoad, onLogActivity }) {
     const [loading, setLoading] = useState(false);
 
     const calculateBounds = (points) => {
@@ -95,6 +95,7 @@ function FileUploader({ onFileLoad }) {
         setLoading(true);
         const file = acceptedFiles[0];
         console.log(file.name);
+        
         try {
             let pointCloudData = {
                 pcd: null,
@@ -111,6 +112,7 @@ function FileUploader({ onFileLoad }) {
                     bounds: result.bounds,
                     numPoints: result.numPoints
                 };
+                onLogActivity(`Processed XYZ file with ${result.numPoints.toLocaleString()} points`);
             } 
             else if (file.name.toLowerCase().endsWith('.pcd')) {
                 const result = await processPCDFile(file);
@@ -120,6 +122,7 @@ function FileUploader({ onFileLoad }) {
                     bounds: result.bounds,
                     numPoints: result.numPoints
                 };
+                onLogActivity(`Processed PCD file with ${result.numPoints.toLocaleString()} points`);
             }
 
             const fileData = {
@@ -135,11 +138,12 @@ function FileUploader({ onFileLoad }) {
 
             onFileLoad(fileData);
         } catch (error) {
+            onLogActivity(`Error processing file: ${error.message}`);
             console.error('Error processing file:', error);
         } finally {
             setLoading(false);
         }
-    }, [onFileLoad]);
+    }, [onFileLoad, onLogActivity]);
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
         onDrop,
@@ -204,7 +208,8 @@ function FileUploader({ onFileLoad }) {
 }
 
 FileUploader.propTypes = {
-    onFileLoad: PropTypes.func.isRequired
+    onFileLoad: PropTypes.func.isRequired,
+    onLogActivity: PropTypes.func.isRequired
 };
 
 export default FileUploader;

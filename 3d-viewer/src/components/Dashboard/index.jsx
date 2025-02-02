@@ -8,26 +8,44 @@ import FileInfo from '../FileInfo';
 import ActivityLogs from '../ActivityLogs';
 import './styles.css';
 
-function DashboardLayout({ userLogs, onFileUpload }) {
+function DashboardLayout({ userLogs, onFileUpload, onLogActivity }) {
     const [viewMode, setViewMode] = useState('3D');
     const [fileData, setFileData] = useState(null);
 
     const onFileLoad = (data) => {
-        console.log('File loaded:', data);
-        setFileData(data);
-        
-        // Automatically switch view mode based on file type
-        const fileExtension = data.file.name.split('.').pop().toLowerCase();
-        if (fileExtension === 'geojson' || fileExtension === 'json') {
-            setViewMode('2D');
-        } else if (['xyz', 'pcd'].includes(fileExtension)) {
-            setViewMode('3D');
+        try {
+            console.log('File loaded:', data);
+            setFileData(data);
+            
+            // Log file upload
+            onLogActivity(`File uploaded: ${data.file.name} (${(data.file.size / 1024).toFixed(2)} KB)`);
+            if (data.pointCloud?.numPoints) {
+                onLogActivity(`Points loaded: ${data.pointCloud.numPoints.toLocaleString()}`);
+            }
+            
+            // Automatically switch view mode based on file type
+            const fileExtension = data.file.name.split('.').pop().toLowerCase();
+            if (fileExtension === 'geojson' || fileExtension === 'json') {
+                setViewMode('2D');
+                onLogActivity('Automatically switched to 2D view for GeoJSON file');
+            } else if (['xyz', 'pcd'].includes(fileExtension)) {
+                setViewMode('3D');
+                onLogActivity('Automatically switched to 3D view for point cloud file');
+            }
+            
+            if (onFileUpload) {
+                onFileUpload(data);
+            }
+        } catch (error) {
+            onLogActivity(`Error loading file: ${error.message}`);
+            console.error('Error in onFileLoad:', error);
         }
-        
-        // Call the parent's onFileUpload if it exists
-        if (onFileUpload) {
-            onFileUpload(data);
-        }
+    };
+
+    const handleViewModeChange = (event) => {
+        const newMode = event.target.checked ? '2D' : '3D';
+        setViewMode(newMode);
+        onLogActivity(`View mode changed to ${newMode}`);
     };
 
     return (
@@ -63,7 +81,7 @@ function DashboardLayout({ userLogs, onFileUpload }) {
                         flexShrink: 0,
                         width: { xs: '50%', md: '100%' }
                     }}>
-                    <FileUploader onFileLoad={onFileLoad} />
+                    <FileUploader onFileLoad={onFileLoad} onLogActivity={onLogActivity} />
                 </Box>
                 
                 {/* View Mode Switch */}
@@ -81,7 +99,7 @@ function DashboardLayout({ userLogs, onFileUpload }) {
                         control={
                             <Switch
                                 checked={viewMode === '2D'}
-                                onChange={(event) => setViewMode(event.target.checked ? '2D' : '3D')}
+                                onChange={handleViewModeChange}
                                 color="primary"
                             />
                         }
@@ -160,12 +178,17 @@ function DashboardLayout({ userLogs, onFileUpload }) {
                         {viewMode === '3D' ? (
                             <ThreeDViewer 
                                 key="3d" 
-                                fileData={fileData} 
+                                fileData={fileData}
+                                onLogActivity={onLogActivity}
                             />
                         ) : (
                             <MapViewer 
                                 key="2d" 
-                                geoData={fileData?.geoJson}
+                                geoData={fileData?.geoJson || {
+                                    type: 'FeatureCollection',
+                                    features: []
+                                }}
+                                onLogActivity={onLogActivity}
                             />
                         )}
                     </Box>
@@ -180,7 +203,8 @@ function DashboardLayout({ userLogs, onFileUpload }) {
 
 DashboardLayout.propTypes = {
     userLogs: PropTypes.arrayOf(PropTypes.string).isRequired,
-    onFileUpload: PropTypes.func.isRequired
+    onFileUpload: PropTypes.func.isRequired,
+    onLogActivity: PropTypes.func.isRequired
 };
 
 export default DashboardLayout;

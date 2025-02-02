@@ -113,11 +113,11 @@ PointCloud.propTypes = {
     scale: PropTypes.number.isRequired
 };
 
-function ThreeDViewer({ fileData }) {
+function ThreeDViewer({ fileData, onLogActivity }) {
     const cameraRef = useRef();
     const controlsRef = useRef();  // Add ref for OrbitControls
     const [bounds, setBounds] = useState(null);
-    const [pointRadius, setPointRadius] = useState(0.4);
+    const [pointRadius, setPointRadius] = useState(1.0);
     const [pointColor, setPointColor] = useState(null);
     const [opacity, setOpacity] = useState(1);
     const [sizeAttenuation, setSizeAttenuation] = useState(true);
@@ -190,8 +190,16 @@ function ThreeDViewer({ fileData }) {
         controlsRef.current.update();
     }, []);
 
+    // Add point size update function
+    const updatePointSize = useCallback((newSize) => {
+        setPointRadius(newSize);
+        if (pcdPoints?.material) {
+            pcdPoints.material.size = newSize;
+            pcdPoints.material.needsUpdate = true;
+        }
+    }, [pcdPoints]);
+
     const { 
-        pointSize,
         useVertexColors,
         color,
         pointOpacity,
@@ -199,13 +207,24 @@ function ThreeDViewer({ fileData }) {
         cameraFOV,
         backgroundColor
     } = useControls({
-        pointSize: {
-            value: 0.4,
-            min: 0.1,
-            max: 5,
-            step: 0.1,
-            label: 'Point Size'
-        },
+        PointSize: folder({
+            controls: buttonGroup({
+                '➖': () => {
+                    const newSize = Math.max(0.1, pointRadius - 0.1);
+                    updatePointSize(newSize);
+                    onLogActivity(`Point size decreased to ${newSize.toFixed(1)}`);
+                },
+                '🔄': () => {
+                    updatePointSize(1.0);
+                    onLogActivity('Point size reset to 1.0');
+                },
+                '➕': () => {
+                    const newSize = pointRadius + 0.1;
+                    updatePointSize(newSize);
+                    onLogActivity(`Point size increased to ${newSize.toFixed(1)}`);
+                }
+            })
+        }),
         Scale: folder({
             currentScale: {
                 value: scale.toFixed(3),
@@ -387,9 +406,9 @@ function ThreeDViewer({ fileData }) {
         }
     }, [pcdPoints, fileData]);
 
-    // Sync all controls with state
+    // Remove the effect that was syncing with pointSize control
+    // since we're now managing point size directly
     useEffect(() => {
-        setPointRadius(pointSize);
         setPointColor(useVertexColors ? null : color);
         setOpacity(pointOpacity);
         setSizeAttenuation(enableSizeAttenuation);
@@ -397,7 +416,7 @@ function ThreeDViewer({ fileData }) {
             cameraRef.current.fov = cameraFOV;
             cameraRef.current.updateProjectionMatrix();
         }
-    }, [pointSize, useVertexColors, color, pointOpacity, enableSizeAttenuation, cameraFOV]);
+    }, [useVertexColors, color, pointOpacity, enableSizeAttenuation, cameraFOV]);
 
     // Apply scale to PCD object
     useEffect(() => {
@@ -417,6 +436,66 @@ function ThreeDViewer({ fileData }) {
         // 调整相机位置到正面视角
         return [maxDim * 2, maxDim * 1.5, maxDim * 2];
     }, [bounds]);
+
+    // Add state to track last camera position for detecting changes
+    const lastCameraState = useRef({
+        position: new THREE.Vector3(),
+        zoom: 0,
+        rotation: new THREE.Euler()
+    });
+
+    // Add debounced logging function
+    const debouncedLogCameraUpdate = useCallback(
+        (() => {
+            let timeout;
+            return (changes) => {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => {
+                    onLogActivity(`Camera ${changes.join(' and ')}`);
+                }, 100); // 100ms debounce
+            };
+        })(),
+        [onLogActivity]
+    );
+
+    // Add camera change handler
+    const handleCameraChange = useCallback((e) => {
+        if (!cameraRef.current) return;
+
+        const changes = [];
+        const currentPos = cameraRef.current.position;
+        const lastPos = lastCameraState.current.position;
+        const currentZoom = controlsRef.current.target.distanceTo(currentPos);
+        const lastZoom = lastCameraState.current.zoom;
+        const currentRotation = cameraRef.current.rotation;
+        const lastRotation = lastCameraState.current.rotation;
+
+        // Check for rotation (by comparing Euler angles)
+        if (!currentRotation.equals(lastRotation)) {
+            changes.push('rotated');
+        }
+
+        // Check for zoom
+        if (Math.abs(currentZoom - lastZoom) > 0.1) {
+            changes.push(currentZoom > lastZoom ? 'zoomed out' : 'zoomed in');
+        }
+
+        // Check for pan (position changed but rotation didn't)
+        if (!currentPos.equals(lastPos) && currentRotation.equals(lastRotation)) {
+            changes.push('panned');
+        }
+
+        if (changes.length > 0) {
+            debouncedLogCameraUpdate(changes);
+        }
+
+        // Update last state
+        lastCameraState.current = {
+            position: currentPos.clone(),
+            zoom: currentZoom,
+            rotation: currentRotation.clone()
+        };
+    }, [debouncedLogCameraUpdate]);
 
     const renderPointCloud = () => {
         if (pcdPoints) {
@@ -474,6 +553,7 @@ function ThreeDViewer({ fileData }) {
                     zoomSpeed={0.8}
                     panSpeed={0.5}
                     target={[0, 0, 0]}
+                    onChange={handleCameraChange}
                 />
                 <ambientLight intensity={0.8} />
                 <directionalLight position={[10, 10, 5]} intensity={1} />
@@ -509,7 +589,8 @@ ThreeDViewer.propTypes = {
             })
         }),
         geoJson: PropTypes.any
-    })
+    }),
+    onLogActivity: PropTypes.func.isRequired
 };
 
 export default ThreeDViewer;

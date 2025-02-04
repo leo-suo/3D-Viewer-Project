@@ -22,6 +22,16 @@ function MapViewer({ geoData, onLogActivity }) {
         bearing: 0
     });
 
+    const [historyViewState, setHistoryViewState] = useState({
+        longitude: 0,
+        latitude: 0,
+        zoom: 2,
+        pitch: 0,
+        bearing: 0
+    });
+
+    const lastLogTimeRef = useRef(0);  // Add this to track last log time
+
     useEffect(() => {
         if (geoData && geoData.features.length > 0) {
             const coordinates = geoData.features.flatMap(feature => {
@@ -123,8 +133,27 @@ function MapViewer({ geoData, onLogActivity }) {
     // Add logging to view state changes
     const onViewStateChange = ({ viewState }) => {
         setViewState(viewState);
-        // Debounce this to avoid too many logs
-        onLogActivity(`Map view updated: zoom ${viewState.zoom.toFixed(1)}`);
+
+        const now = Date.now();
+        // Compare with history and log changes, with 100ms debounce
+        const isZooming = Math.abs(viewState.zoom - historyViewState.zoom) > 0.1;
+        if (isZooming && now - lastLogTimeRef.current > 100) {
+            onLogActivity(`Map zoom changed to ${viewState.zoom.toFixed(1)}`);
+            lastLogTimeRef.current = now;
+        }
+
+        // Only check position changes if not zooming, and use a larger threshold
+        if (!isZooming && (
+            Math.abs(viewState.longitude - historyViewState.longitude) > 0.5 || 
+            Math.abs(viewState.latitude - historyViewState.latitude) > 0.5
+        )) {
+            onLogActivity(
+                `Map position moved to [${viewState.longitude.toFixed(2)}, ${viewState.latitude.toFixed(2)}]`
+            );
+        }
+
+        // Update history after logging changes
+        setHistoryViewState(viewState);
     };
 
     return (

@@ -125,17 +125,6 @@ function DashboardLayout({ userLogs, onFileUpload, onLogActivity }) {
                             overflow: 'auto',
                             width: { xs: '50%', md: '100%' }
                     }}>
-                        <Typography 
-                            className="dashboard__file-info-title"
-                            variant="subtitle2" 
-                            sx={{ 
-                                mb: 1,
-                                color: 'text.secondary',
-                                fontSize: { xs: '0.7rem', md: '0.8rem' }
-                            }}
-                        >
-                            File Information
-                        </Typography>
                         <FileInfo fileData={fileData} />
                     </Box>
                 )}

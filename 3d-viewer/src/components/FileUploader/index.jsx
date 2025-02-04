@@ -16,6 +16,8 @@ function FileUploader({ onFileLoad, onLogActivity }) {
         let minY = Infinity, maxY = -Infinity;
         let minZ = Infinity, maxZ = -Infinity;
 
+        console.log(points);
+
         // For XYZ array of point objects
         if (Array.isArray(points)) {
             points.forEach(point => {

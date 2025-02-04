@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { PCDLoader } from 'three/examples/jsm/loaders/PCDLoader';
 import './styles.css';
 
-function PointCloud({ points, pointRadius, pointColor, opacity, sizeAttenuation, scale }) {
+function PointCloud({ points, pointRadius, pointColor, opacity, sizeAttenuation, scale, useVertexColors }) {
     console.log('Rendering points:', points?.length);
 
     const { positions, colors } = useMemo(() => {
@@ -36,18 +36,10 @@ function PointCloud({ points, pointRadius, pointColor, opacity, sizeAttenuation,
             z: (minZ + maxZ) / 2
         };
 
-        const maxDimension = Math.max(
-            maxX - minX,
-            maxY - minY,
-            maxZ - minZ
-        );
-        
-        const targetSize = 10;
-        const scaleFactor = maxDimension > 0 ? targetSize / maxDimension : 1;
 
         console.log("XYZ Bounding Box:", { minX, maxX, minY, maxY, minZ, maxZ });
         console.log("XYZ Center:", { centerX: center.x, centerY: center.y, centerZ: center.z });
-        console.log("XYZ Scale Factor:", scaleFactor);
+        console.log("XYZ Scale:", scale);
 
         // Filter and transform points
         const positionsArray = [];
@@ -55,24 +47,30 @@ function PointCloud({ points, pointRadius, pointColor, opacity, sizeAttenuation,
 
         points.forEach(point => {
             // Center and scale the point
-            const x = (point.x - center.x) * scaleFactor;
-            const y = (point.y - center.y) * scaleFactor;
-            const z = (point.z - center.z) * scaleFactor;
+            const x = (point.x - center.x) * scale;
+            const y = (point.y - center.y) * scale;
+            const z = (point.z - center.z) * scale;
 
             positionsArray.push(x, y, z);
 
-            const normalizedHeight = (point.y - minY) / (maxY - minY);
-            const hue = normalizedHeight * 0.8;
-            const color = new THREE.Color();
-            color.setHSL(hue, 1, 0.5);
-            colorsArray.push(color.r, color.g, color.b);
+            if (useVertexColors) {
+                // Height-based color calculation using Z axis
+                const normalizedHeight = (z - minZ) / (maxZ - minZ);
+                const hue = normalizedHeight * 0.8;
+                const color = new THREE.Color();
+                color.setHSL(hue, 1, 0.5);
+                colorsArray.push(color.r, color.g, color.b);
+            } else {
+                // Use white color (will be tinted by material color)
+                colorsArray.push(1, 1, 1);
+            }
         });
 
         return {
             positions: new Float32Array(positionsArray),
             colors: new Float32Array(colorsArray)
         };
-    }, [points]);
+    }, [points, scale, useVertexColors]);
 
     const geometry = useMemo(() => {
         const geo = new THREE.BufferGeometry();
@@ -87,13 +85,13 @@ function PointCloud({ points, pointRadius, pointColor, opacity, sizeAttenuation,
         const material = new THREE.PointsMaterial({
             size: pointRadius,
             sizeAttenuation: sizeAttenuation,
-            vertexColors: !pointColor,
-            ...(pointColor ? { color: new THREE.Color(pointColor) } : {}),
+            vertexColors: useVertexColors,
+            color: useVertexColors ? undefined : new THREE.Color(pointColor),
             transparent: true,
             opacity: opacity
         });
         return material;
-    }, [pointRadius, pointColor, opacity, sizeAttenuation]);
+    }, [pointRadius, pointColor, opacity, sizeAttenuation, useVertexColors]);
 
     return positions.length > 0 ? (
         <primitive object={new THREE.Points(geometry, pointsMaterial)} />
@@ -110,7 +108,8 @@ PointCloud.propTypes = {
     pointColor: PropTypes.string,
     opacity: PropTypes.number.isRequired,
     sizeAttenuation: PropTypes.bool.isRequired,
-    scale: PropTypes.number.isRequired
+    scale: PropTypes.number.isRequired,
+    useVertexColors: PropTypes.bool.isRequired
 };
 
 function ThreeDViewer({ fileData, onLogActivity }) {
@@ -118,6 +117,7 @@ function ThreeDViewer({ fileData, onLogActivity }) {
     const controlsRef = useRef();  // Add ref for OrbitControls
     const [bounds, setBounds] = useState(null);
     const [pointRadius, setPointRadius] = useState(1.0);
+    const [pointStepValue, setPointStepValue] = useState(0.1);  // Add step state for point size
     const [pointColor, setPointColor] = useState(null);
     const [opacity, setOpacity] = useState(1);
     const [sizeAttenuation, setSizeAttenuation] = useState(true);
@@ -151,50 +151,73 @@ function ThreeDViewer({ fileData, onLogActivity }) {
     // Get the Leva store context
     const store = useStoreContext();
 
-    // Update camera control function
+    // Update camera position to view from an angle where Z is up
+    const cameraPosition = useMemo(() => {
+        if (!bounds) return [10, 10, 20]; // Changed initial position
+        const maxDim = Math.max(
+            bounds.maxX - bounds.minX,
+            bounds.maxY - bounds.minY,
+            bounds.maxZ - bounds.minZ
+        );
+        // Position camera to view Z as up (X, Y, Z)
+        return [maxDim * 1.5, maxDim * 1.5, maxDim * 2]; // Increased Z component
+    }, [bounds]);
+
+    // Update setViewDirection to maintain Z-up orientation
     const setViewDirection = useCallback((direction) => {
-        console.log('Setting view direction:', direction);
-        if (!cameraRef.current || !controlsRef.current) {
-            console.log('Missing required refs');
-            return;
-        }
+        if (!cameraRef.current || !controlsRef.current) return;
 
-        // Get current distance from origin
         const currentDistance = cameraRef.current.position.length();
-        console.log('Current distance:', currentDistance);
-
-        // Define unit vectors for each direction
+        
         const views = {
-            front: [0, 0, 1],
-            back: [0, 0, -1],
-            left: [-1, 0, 0],
-            right: [1, 0, 0],
-            top: [0, 1, 0],
-            bottom: [0, -1, 0]
+            front: [1, 0, 0.5],     // Looking along X axis, up is Z
+            back: [-1, 0, 0.5],     // Looking along -X axis, up is Z
+            left: [0, 1, 0.5],      // Looking along Y axis, up is Z
+            right: [0, -1, 0.5],    // Looking along -Y axis, up is Z
+            top: [0, 0, 1],         // Looking straight down Z axis
+            bottom: [0, 0, -1]      // Looking straight up -Z axis
         };
 
-        // Get direction vector and normalize it
         const directionVector = views[direction];
-        
-        // Scale the direction vector by current distance
         const newPosition = directionVector.map(coord => coord * currentDistance);
-        console.log('New camera position:', newPosition);
         
-        // Update both camera and controls
         cameraRef.current.position.set(...newPosition);
+        cameraRef.current.up.set(0, 0, 1); // Set Z as up direction
         cameraRef.current.lookAt(0, 0, 0);
         cameraRef.current.updateProjectionMatrix();
 
-        // Update OrbitControls target and camera
         controlsRef.current.target.set(0, 0, 0);
+        controlsRef.current.up.set(0, 0, 1); // Set Z as up for controls
         controlsRef.current.update();
     }, []);
 
-    // Add point size update function
-    const updatePointSize = useCallback((newSize) => {
-        setPointRadius(newSize);
+    // Point size control functions
+    const increasePointSize = useCallback(() => {
+        setPointRadius(prev => {
+            const newSize = Math.min(10.0, prev + pointStepValue);
+            if (pcdPoints?.material) {
+                pcdPoints.material.size = newSize;
+                pcdPoints.material.needsUpdate = true;
+            }
+            return newSize;
+        });
+    }, [pcdPoints, pointStepValue]);
+
+    const decreasePointSize = useCallback(() => {
+        setPointRadius(prev => {
+            const newSize = Math.max(0.1, prev - pointStepValue);
+            if (pcdPoints?.material) {
+                pcdPoints.material.size = newSize;
+                pcdPoints.material.needsUpdate = true;
+            }
+            return newSize;
+        });
+    }, [pcdPoints, pointStepValue]);
+
+    const resetPointSize = useCallback(() => {
+        setPointRadius(1.0);
         if (pcdPoints?.material) {
-            pcdPoints.material.size = newSize;
+            pcdPoints.material.size = 1.0;
             pcdPoints.material.needsUpdate = true;
         }
     }, [pcdPoints]);
@@ -208,32 +231,36 @@ function ThreeDViewer({ fileData, onLogActivity }) {
         backgroundColor
     } = useControls({
         PointSize: folder({
+            pointStepSize: {
+                value: 0.1,
+                label: 'Point Step Size',
+                type: 'NUMBER',
+                onChange: (value) => {
+                    const newStep = Math.abs(Number(value));
+                    if (!isNaN(newStep) && newStep > 0) {
+                        setPointStepValue(newStep);
+                    }
+                }
+            },
             controls: buttonGroup({
                 '➖': () => {
-                    const newSize = Math.max(0.1, pointRadius - 0.1);
-                    updatePointSize(newSize);
-                    onLogActivity(`Point size decreased to ${newSize.toFixed(1)}`);
+                    decreasePointSize();
+                    onLogActivity(`Point size decreased to ${pointRadius.toFixed(1)}`);
                 },
                 '🔄': () => {
-                    updatePointSize(1.0);
+                    resetPointSize();
                     onLogActivity('Point size reset to 1.0');
                 },
                 '➕': () => {
-                    const newSize = pointRadius + 0.1;
-                    updatePointSize(newSize);
-                    onLogActivity(`Point size increased to ${newSize.toFixed(1)}`);
+                    increasePointSize();
+                    onLogActivity(`Point size increased to ${pointRadius.toFixed(1)}`);
                 }
             })
         }),
         Scale: folder({
-            currentScale: {
-                value: scale.toFixed(3),
-                label: 'Current',
-                editable: false,
-            },
-            stepSize: {
+            scaleStepSize: {
                 value: 0.1,
-                label: 'Step Size',
+                label: 'Scale Step Size',
                 type: 'NUMBER',
                 onChange: (value) => {
                     const newStep = Math.abs(Number(value));
@@ -251,6 +278,11 @@ function ThreeDViewer({ fileData, onLogActivity }) {
         useVertexColors: {
             value: true,
             label: 'Use Height Colors'
+        },
+        color: {
+            value: '#ffffff',
+            label: 'Point Color',
+            render: (get) => !get('useVertexColors')  // Only show when useVertexColors is false
         },
         pointOpacity: {
             value: 1,
@@ -296,6 +328,13 @@ function ThreeDViewer({ fileData, onLogActivity }) {
             store.set({ 'Scale.currentScale': scale.toFixed(3) });
         }
     }, [scale, store]);
+
+    // Update point size display
+    useEffect(() => {
+        if (store) {
+            store.set({ 'PointSize.currentSize': pointRadius.toFixed(3) });
+        }
+    }, [pointRadius, store]);
 
     // Set initial bounds from fileData
     useEffect(() => {
@@ -383,8 +422,8 @@ function ThreeDViewer({ fileData, onLogActivity }) {
             const bounds = fileData.pointCloud.bounds;
             
             for (let i = 0; i < positions.length; i += 3) {
-                const y = positions[i + 1];
-                const normalizedHeight = (y - bounds.minY) / (bounds.maxY - bounds.minY);
+                const z = positions[i + 2];  // Z is the third component
+                const normalizedHeight = (z - bounds.minZ) / (bounds.maxZ - bounds.minZ);
                 const hue = normalizedHeight * 0.8;
                 const color = new THREE.Color();
                 color.setHSL(hue, 1, 0.5);
@@ -424,18 +463,6 @@ function ThreeDViewer({ fileData, onLogActivity }) {
             pcdPoints.scale.set(scale, scale, scale);
         }
     }, [pcdPoints, scale]);
-
-    const cameraPosition = useMemo(() => {
-        if (!bounds) return [10, 10, 10];
-        const maxDim = Math.max(
-            bounds.maxX - bounds.minX,
-            bounds.maxY - bounds.minY,
-            bounds.maxZ - bounds.minZ
-        );
-        console.log('Max dimension:', maxDim);
-        // 调整相机位置到正面视角
-        return [maxDim * 2, maxDim * 1.5, maxDim * 2];
-    }, [bounds]);
 
     // Add state to track last camera position for detecting changes
     const lastCameraState = useRef({
@@ -519,10 +546,11 @@ function ThreeDViewer({ fileData, onLogActivity }) {
                 <PointCloud 
                     points={pointCloudData} 
                     pointRadius={pointRadius}
-                    pointColor={pointColor}
+                    pointColor={color}
                     opacity={opacity}
                     sizeAttenuation={sizeAttenuation}
                     scale={scale}
+                    useVertexColors={useVertexColors}
                 />
             );
         }
@@ -531,8 +559,8 @@ function ThreeDViewer({ fileData, onLogActivity }) {
     return (
         <div style={{ width: '100%', height: '100%', background: backgroundColor, position: 'relative' }}>
             <Canvas
-                camera={{ position: cameraPosition, fov: cameraFOV }}
-                gl={{ antialias: true, preserveDrawingBuffer:true }}
+                camera={{ position: cameraPosition, fov: cameraFOV, up: [0, 0, 1] }}
+                gl={{ antialias: true, preserveDrawingBuffer: true }}
                 style={{ background: backgroundColor }}
             >
                 <Stats />
@@ -544,6 +572,7 @@ function ThreeDViewer({ fileData, onLogActivity }) {
                     aspect={window.innerWidth / window.innerHeight}
                     near={0.1}
                     far={10000}
+                    up={[0, 0, 1]} // Set Z as up
                 />
                 <OrbitControls
                     ref={controlsRef}
@@ -554,12 +583,13 @@ function ThreeDViewer({ fileData, onLogActivity }) {
                     panSpeed={0.5}
                     target={[0, 0, 0]}
                     onChange={handleCameraChange}
+                    up={[0, 0, 1]} // Set Z as up
                 />
                 <ambientLight intensity={0.8} />
                 <directionalLight position={[10, 10, 5]} intensity={1} />
                 {renderPointCloud()}
                 <gridHelper args={[100, 100]} />
-                <axesHelper args={[50]} />
+                <axesHelper args={[50]} position={[0, 0, 0]} />
             </Canvas>
         </div>
     );

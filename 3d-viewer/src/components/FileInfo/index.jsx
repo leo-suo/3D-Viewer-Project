@@ -13,15 +13,7 @@ function FileInfo({ fileData }) {
     return (
         <Paper 
             elevation={2}
-            sx={{
-                p: 2,
-                bgcolor: 'background.paper',
-                borderRadius: 1
-            }}
         >
-            <Typography variant="h6" gutterBottom>
-                File Information
-            </Typography>
             
             <Box sx={{ mb: 2 }}>
                 <Typography variant="body2" color="text.secondary">

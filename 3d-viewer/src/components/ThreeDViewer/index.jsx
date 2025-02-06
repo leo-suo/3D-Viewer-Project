@@ -22,11 +22,11 @@ function PointCloud({ points, pointRadius, pointColor, opacity, sizeAttenuation,
 
         points.forEach(point => {
             minX = Math.min(minX, point.x);
+            minY = Math.min(minY, point.z);
+            minZ = Math.min(minZ, -point.y);
             maxX = Math.max(maxX, point.x);
-            minY = Math.min(minY, point.y);
-            maxY = Math.max(maxY, point.y);
-            minZ = Math.min(minZ, point.z);
-            maxZ = Math.max(maxZ, point.z);
+            maxY = Math.max(maxY, point.z);
+            maxZ = Math.max(maxZ, -point.y);
         });
 
         // Step 2: Compute center and scale
@@ -48,8 +48,8 @@ function PointCloud({ points, pointRadius, pointColor, opacity, sizeAttenuation,
         points.forEach(point => {
             // Center and scale the point
             const x = (point.x - center.x) * scale;
-            const y = (point.y - center.y) * scale;
-            const z = (point.z - center.z) * scale;
+            const y = (point.z - center.y) * scale;
+            const z = (-point.y - center.z) * scale;
 
             positionsArray.push(x, y, z);
 
@@ -127,8 +127,6 @@ function ThreeDViewer({ fileData, onLogActivity }) {
 
     // Add scale step state
     const [scaleStepValue, setScaleStepValue] = useState(0.1);
-    const MIN_SCALE = 0.1;
-    const MAX_SCALE = 10.0;
     const DEFAULT_SCALE = 1.0;
 
     // Create a ref to store the current step value
@@ -169,25 +167,26 @@ function ThreeDViewer({ fileData, onLogActivity }) {
 
         const currentDistance = cameraRef.current.position.length();
         
+        // Adjusted view vectors for Z-up orientation
         const views = {
-            front: [1, 0, 0.5],     // Looking along X axis, up is Z
-            back: [-1, 0, 0.5],     // Looking along -X axis, up is Z
-            left: [0, 1, 0.5],      // Looking along Y axis, up is Z
-            right: [0, -1, 0.5],    // Looking along -Y axis, up is Z
-            top: [0, 0, 1],         // Looking straight down Z axis
-            bottom: [0, 0, -1]      // Looking straight up -Z axis
+            front: [1, 0, 0],      // Looking along X axis (YZ plane)
+            back: [-1, 0, 0],      // Looking along -X axis (YZ plane)
+            left: [0, 1, 0],       // Looking along Y axis (XZ plane)
+            right: [0, -1, 0],     // Looking along -Y axis (XZ plane)
+            top: [0, 0, 1],        // Looking down Z axis (XY plane)
+            bottom: [0, 0, -1]     // Looking up -Z axis (XY plane)
         };
 
         const directionVector = views[direction];
         const newPosition = directionVector.map(coord => coord * currentDistance);
         
         cameraRef.current.position.set(...newPosition);
-        cameraRef.current.up.set(0, 0, 1); // Set Z as up direction
+        cameraRef.current.up.set(0, 0, 1);  // Keep Z as up
         cameraRef.current.lookAt(0, 0, 0);
         cameraRef.current.updateProjectionMatrix();
 
         controlsRef.current.target.set(0, 0, 0);
-        controlsRef.current.up.set(0, 0, 1); // Set Z as up for controls
+        controlsRef.current.up.set(0, 0, 1); // Keep Z as up
         controlsRef.current.update();
     }, []);
 
@@ -356,6 +355,9 @@ function ThreeDViewer({ fileData, onLogActivity }) {
                 try {
                     const loader = new PCDLoader();
                     const pcdObject = await loader.loadAsync(fileData.pointCloud.pcd);
+                    
+                    // Rotate the geometry to make Z up
+                    pcdObject.geometry.rotateX(Math.PI / 2);
                     
                     // Get bounds from fileData
                     const bounds = fileData.pointCloud.bounds;
@@ -588,7 +590,6 @@ function ThreeDViewer({ fileData, onLogActivity }) {
                 <ambientLight intensity={0.8} />
                 <directionalLight position={[10, 10, 5]} intensity={1} />
                 {renderPointCloud()}
-                <gridHelper args={[100, 100]} />
                 <axesHelper args={[50]} position={[0, 0, 0]} />
             </Canvas>
         </div>

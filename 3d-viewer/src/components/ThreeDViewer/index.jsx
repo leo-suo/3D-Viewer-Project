@@ -576,7 +576,6 @@ function ThreeDViewer({ fileData, onLogActivity }) {
                 gl={{ antialias: true, preserveDrawingBuffer: true }}
                 style={{ background: backgroundColor }}
             >
-                <Stats />
                 <PerspectiveCamera
                     ref={cameraRef}
                     makeDefault

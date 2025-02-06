@@ -230,21 +230,10 @@ function ThreeDViewer({ fileData, onLogActivity }) {
         backgroundColor
     } = useControls({
         PointSize: folder({
-            pointStepSize: {
-                value: 0.1,
-                label: 'Point Step Size',
-                type: 'NUMBER',
-                onChange: (value) => {
-                    const newStep = Math.abs(Number(value));
-                    if (!isNaN(newStep) && newStep > 0) {
-                        setPointStepValue(newStep);
-                    }
-                }
-            },
             controls: buttonGroup({
                 '➖': () => {
                     decreasePointSize();
-                    onLogActivity(`Point size decreased to ${pointRadius.toFixed(1)}`);
+                    onLogActivity(`Point size decreased`);
                 },
                 '🔄': () => {
                     resetPointSize();
@@ -252,7 +241,7 @@ function ThreeDViewer({ fileData, onLogActivity }) {
                 },
                 '➕': () => {
                     increasePointSize();
-                    onLogActivity(`Point size increased to ${pointRadius.toFixed(1)}`);
+                    onLogActivity(`Point size increased`);
                 }
             })
         }),

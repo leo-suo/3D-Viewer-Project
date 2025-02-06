@@ -499,19 +499,50 @@ function ThreeDViewer({ fileData, onLogActivity }) {
         const currentRotation = cameraRef.current.rotation;
         const lastRotation = lastCameraState.current.rotation;
 
-        // Check for rotation (by comparing Euler angles)
+        // Check for rotation by comparing Euler angles
         if (!currentRotation.equals(lastRotation)) {
-            changes.push('rotated');
+            // Calculate rotation differences
+            const xDiff = Math.abs(currentRotation.x - lastRotation.x);
+            const yDiff = Math.abs(currentRotation.y - lastRotation.y);
+            const zDiff = Math.abs(currentRotation.z - lastRotation.z);
+            
+            if (xDiff > yDiff && xDiff > zDiff) {
+                changes.push('rotated around X axis');
+            } else if (yDiff > xDiff && yDiff > zDiff) {
+                changes.push('rotated around Y axis');
+            } else if (zDiff > xDiff && zDiff > yDiff) {
+                changes.push('rotated around Z axis');
+            } else {
+                changes.push('rotated in multiple axes');
+            }
         }
 
-        // Check for zoom
+        // Check for zoom with direction and magnitude
         if (Math.abs(currentZoom - lastZoom) > 0.1) {
-            changes.push(currentZoom > lastZoom ? 'zoomed out' : 'zoomed in');
+            const zoomDiff = Math.abs(currentZoom - lastZoom);
+            const zoomMagnitude = zoomDiff > 2 ? 'significantly ' : '';
+            changes.push(currentZoom > lastZoom ? 
+                `${zoomMagnitude}zoomed out` : 
+                `${zoomMagnitude}zoomed in`);
         }
 
-        // Check for pan (position changed but rotation didn't)
+        // Check for pan by comparing positions while accounting for zoom
         if (!currentPos.equals(lastPos) && currentRotation.equals(lastRotation)) {
-            changes.push('panned');
+            // Calculate pan direction
+            const xDiff = currentPos.x - lastPos.x;
+            const yDiff = currentPos.y - lastPos.y;
+            const zDiff = currentPos.z - lastPos.z;
+            
+            let direction = '';
+            if (Math.abs(xDiff) > Math.abs(yDiff) && Math.abs(xDiff) > Math.abs(zDiff)) {
+                direction = xDiff > 0 ? 'right' : 'left';
+            } else if (Math.abs(yDiff) > Math.abs(xDiff) && Math.abs(yDiff) > Math.abs(zDiff)) {
+                direction = yDiff > 0 ? 'up' : 'down';
+            } else if (Math.abs(zDiff) > Math.abs(xDiff) && Math.abs(zDiff) > Math.abs(yDiff)) {
+                direction = zDiff > 0 ? 'forward' : 'backward';
+            }
+            
+            changes.push(`panned ${direction}`);
         }
 
         if (changes.length > 0) {

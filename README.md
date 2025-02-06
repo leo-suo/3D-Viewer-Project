@@ -32,7 +32,7 @@ A web-based application for visualizing and interacting with 3D point cloud data
 1. Clone the repository:
 
 ```bash
-git clone [https://github.com/yourusername/3d-viewer.git](https://github.com/leo-suo/3D-Viewer-Project.git)
+git clone https://github.com/leo-suo/3D-Viewer-Project.git
 cd 3d-viewer
 ```
 
@@ -43,7 +43,7 @@ npm install
 
 3. Create a `.env` file in the root directory and add your Mapbox token:
 ```
-REACT_APP_MAPBOX_TOKEN=your_mapbox_token_here
+VITE_MAPBOX_TOKEN=your_mapbox_token_here
 ```
 
 4. Start the development server:
@@ -98,4 +98,9 @@ Main dependencies include:
 
 ## License
 
-This project is licensed under the MIT License. 
+This project is licensed under the MIT License.
+
+**Important Notes:**
+- Environment variables must be prefixed with `VITE_` to be accessible in the application
+- The `.env` file should be added to `.gitignore` to keep sensitive tokens out of version control
+- After creating or modifying the `.env` file, restart the development server for changes to take effect 

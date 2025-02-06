@@ -5,8 +5,8 @@ import { GeoJsonLayer } from '@deck.gl/layers';
 import Map from 'react-map-gl';
 import { Box, Typography } from '@mui/material';
 
-// Mapbox API Key
-const MAPBOX_TOKEN = 'pk.eyJ1IjoibGVvc3VvIiwiYSI6ImNtNmJhbzhxMDA2bmkyam84ejh3dngyZWkifQ.GIxeZlnIerRey6wNUQmiCQ';
+// Use environment variable for Mapbox token
+const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
 
 function MapViewer({ geoData, onLogActivity }) {
     const deckRef = useRef(null);

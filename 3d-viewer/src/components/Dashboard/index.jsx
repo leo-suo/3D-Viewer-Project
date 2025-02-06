@@ -14,7 +14,6 @@ function DashboardLayout({ userLogs, onFileUpload, onLogActivity }) {
 
     const onFileLoad = (data) => {
         try {
-            console.log('File loaded:', data);
             setFileData(data);
             
             // Log file upload
@@ -38,7 +37,6 @@ function DashboardLayout({ userLogs, onFileUpload, onLogActivity }) {
             }
         } catch (error) {
             onLogActivity(`Error loading file: ${error.message}`);
-            console.error('Error in onFileLoad:', error);
         }
     };
 

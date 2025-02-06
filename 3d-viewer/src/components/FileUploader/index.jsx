@@ -16,8 +16,6 @@ function FileUploader({ onFileLoad, onLogActivity }) {
         let minY = Infinity, maxY = -Infinity;
         let minZ = Infinity, maxZ = -Infinity;
 
-        console.log(points);
-
         // For XYZ array of point objects
         if (Array.isArray(points)) {
             points.forEach(point => {
@@ -96,7 +94,6 @@ function FileUploader({ onFileLoad, onLogActivity }) {
 
         setLoading(true);
         const file = acceptedFiles[0];
-        console.log(file.name);
         
         try {
             let pointCloudData = {
@@ -141,7 +138,6 @@ function FileUploader({ onFileLoad, onLogActivity }) {
             onFileLoad(fileData);
         } catch (error) {
             onLogActivity(`Error processing file: ${error.message}`);
-            console.error('Error processing file:', error);
         } finally {
             setLoading(false);
         }

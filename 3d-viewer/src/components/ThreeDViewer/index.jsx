@@ -8,8 +8,6 @@ import { PCDLoader } from 'three/examples/jsm/loaders/PCDLoader';
 import './styles.css';
 
 function PointCloud({ points, pointRadius, pointColor, opacity, sizeAttenuation, scale, useVertexColors }) {
-    console.log('Rendering points:', points?.length);
-
     const { positions, colors } = useMemo(() => {
         if (!points || !points.length) {
             return { positions: new Float32Array([]), colors: new Float32Array([]) };
@@ -35,11 +33,6 @@ function PointCloud({ points, pointRadius, pointColor, opacity, sizeAttenuation,
             y: (minY + maxY) / 2,
             z: (minZ + maxZ) / 2
         };
-
-
-        console.log("XYZ Bounding Box:", { minX, maxX, minY, maxY, minZ, maxZ });
-        console.log("XYZ Center:", { centerX: center.x, centerY: center.y, centerZ: center.z });
-        console.log("XYZ Scale:", scale);
 
         // Filter and transform points
         const positionsArray = [];
@@ -77,7 +70,6 @@ function PointCloud({ points, pointRadius, pointColor, opacity, sizeAttenuation,
         geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
         geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
         geo.computeBoundingSphere();
-        console.log('Bounding sphere:', geo.boundingSphere);
         return geo;
     }, [positions, colors]);
 
@@ -327,7 +319,6 @@ function ThreeDViewer({ fileData, onLogActivity }) {
     // Set initial bounds from fileData
     useEffect(() => {
         if (fileData?.pointCloud?.bounds) {
-            console.log('Setting bounds from fileData:', fileData.pointCloud.bounds);
             setBounds(fileData.pointCloud.bounds);
         }
     }, [fileData]);

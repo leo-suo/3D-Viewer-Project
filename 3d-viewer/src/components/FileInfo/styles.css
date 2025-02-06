@@ -1,0 +1,60 @@
+.file-info {
+    background-color: var(--surface-color);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-lg);
+    box-shadow: var(--shadow-sm);
+}
+
+.file-info h3 {
+    color: var(--text-primary);
+    font-size: var(--font-size-md);
+    font-weight: var(--font-weight-medium);
+    margin-bottom: var(--spacing-md);
+}
+
+.info-grid {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.info-item {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    background-color: var(--background-color);
+    padding: var(--spacing-sm);
+    border-radius: var(--border-radius-sm);
+}
+
+.info-label {
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+}
+
+.info-value {
+    color: var(--text-primary);
+    font-size: var(--font-size-sm);
+    font-family: var(--font-family-mono, monospace);
+    word-break: break-all;
+    overflow-wrap: break-word;
+}
+
+.dimensions, .bounds {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    font-family: var(--font-family-mono, monospace);
+    font-size: var(--font-size-sm);
+    color: var(--text-primary);
+    padding: var(--spacing-xs);
+    border-radius: var(--border-radius-sm);
+    overflow-x: auto;
+}
+
+.dimensions div, .bounds div {
+    padding: var(--spacing-xs);
+    background-color: var(--surface-color);
+    border-radius: var(--border-radius-sm);
+} 

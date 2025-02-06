@@ -1,2 +1,8 @@
 SoftwareDeveloper_Project.pdf
 .idea
+*.png
+*.gz
+bunny.tar.gz/
+bunny.tar/
+xyzrgb_dragon.ply/
+.env

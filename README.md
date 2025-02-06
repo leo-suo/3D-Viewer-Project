@@ -48,10 +48,10 @@ VITE_MAPBOX_TOKEN=your_mapbox_token_here
 
 4. Start the development server:
 ```bash
-npm start
+npm run dev
 ```
 
-The application will be available at `http://localhost:3000`
+The application will be available at `http://localhost:5173`
 
 ## Building for Production
 
@@ -60,7 +60,7 @@ To create a production build:
 npm run build
 ```
 
-The build artifacts will be stored in the `build/` directory.
+The build artifacts will be stored in the `dist/` directory.
 
 ## Dependencies
 

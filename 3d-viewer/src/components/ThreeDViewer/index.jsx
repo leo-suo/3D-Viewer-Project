@@ -213,14 +213,13 @@ function ThreeDViewer({ fileData, onLogActivity }) {
         }
     }, [pcdPoints]);
 
-    const { 
-        useVertexColors,
-        color,
-        pointOpacity,
-        enableSizeAttenuation,
-        cameraFOV,
-        backgroundColor
-    } = useControls({
+    // Modify the useControls call to include all existing controls
+    const controls = useControls({
+        Rotation: folder({
+            rotX: { value: 0, min: 0, max: Math.PI * 2, step: 0.01, label: 'X' },
+            rotY: { value: 0, min: 0, max: Math.PI * 2, step: 0.01, label: 'Y' },
+            rotZ: { value: 0, min: 0, max: Math.PI * 2, step: 0.01, label: 'Z' },
+        }),
         PointSize: folder({
             controls: buttonGroup({
                 '➖': () => {
@@ -301,6 +300,17 @@ function ThreeDViewer({ fileData, onLogActivity }) {
             })
         })
     });
+
+    // Correctly destructure all controls
+    const { 
+        rotX, rotY, rotZ,
+        useVertexColors,
+        color,
+        pointOpacity,
+        enableSizeAttenuation,
+        cameraFOV,
+        backgroundColor
+    } = controls;
 
     // Update scale display
     useEffect(() => {
@@ -545,6 +555,8 @@ function ThreeDViewer({ fileData, onLogActivity }) {
                 pcdPoints.material.sizeAttenuation = sizeAttenuation;
                 pcdPoints.material.opacity = opacity;
                 pcdPoints.material.transparent = true;
+                console.log(rotX, rotY, rotZ);
+                pcdPoints.rotation.set(rotX, rotY, rotZ);
                 if (!useVertexColors) {
                     pcdPoints.material.color = new THREE.Color(color);
                     pcdPoints.material.vertexColors = false;
